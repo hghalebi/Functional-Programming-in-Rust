@@ -1,0 +1,296 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Purely Functional State - Functional Programming in Rust</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="A pedagogical guide inspired by the Red Book and Rust resources.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="chapter_1_introduction.html">Introduction</a></li><li class="chapter-item expanded affix "><a href="chapter_2_getting_started.html">Getting Started</a></li><li class="chapter-item expanded affix "><a href="chapter_3_functional_data_structures.html">Functional Data Structures</a></li><li class="chapter-item expanded affix "><a href="chapter_4_handling_errors.html">Handling Errors</a></li><li class="chapter-item expanded affix "><a href="chapter_5_strictness_and_laziness.html">Strictness and Laziness</a></li><li class="chapter-item expanded affix "><a href="chapter_6_purely_functional_state.html" class="active">Purely Functional State</a></li><li class="chapter-item expanded affix "><a href="chapter_7_purely_functional_parallelism.html">Purely Functional Parallelism</a></li><li class="chapter-item expanded affix "><a href="chapter_8_property_based_testing.html">Property-Based Testing</a></li><li class="chapter-item expanded affix "><a href="chapter_9_parser_combinators.html">Parser Combinators</a></li><li class="chapter-item expanded affix "><a href="chapter_10_monoids.html">Monoids</a></li><li class="chapter-item expanded affix "><a href="chapter_11_monads.html">Monads</a></li><li class="chapter-item expanded affix "><a href="chapter_12_applicative.html">Applicative and Traversable</a></li><li class="chapter-item expanded affix "><a href="chapter_13_effects.html">External Effects and I/O</a></li><li class="chapter-item expanded affix "><a href="chapter_14_local_effects.html">Local Effects and Mutable State</a></li><li class="chapter-item expanded affix "><a href="chapter_15_streaming.html">Stream Processing</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Functional Programming in Rust</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="chapter-6-purely-functional-state"><a class="header" href="#chapter-6-purely-functional-state">Chapter 6: Purely Functional State</a></h1>
+<p>Handling state without side effects is a core aspect of functional programming. We use the <strong>State Monad</strong> pattern, where a state transition is a function <code>S -&gt; (A, S)</code>.</p>
+<h2 id="61-generating-random-numbers-simple-rng"><a class="header" href="#61-generating-random-numbers-simple-rng">6.1 Generating random numbers (Simple RNG)</a></h2>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait RNG {
+    fn next_int(&amp;self) -&gt; (i32, Box&lt;dyn RNG&gt;);
+}
+
+#[derive(Clone)]
+pub struct SimpleRNG {
+    seed: i64,
+}
+
+impl SimpleRNG {
+    pub fn new(seed: i64) -&gt; SimpleRNG {
+        SimpleRNG { seed }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-61-non_negative_int"><a class="header" href="#exercise-61-non_negative_int">Exercise 6.1: non_negative_int</a></h3>
+<h3 id="exercise-62-double"><a class="header" href="#exercise-62-double">Exercise 6.2: double</a></h3>
+<h3 id="exercise-63-int_double-double_int-double3"><a class="header" href="#exercise-63-int_double-double_int-double3">Exercise 6.3: int_double, double_int, double3</a></h3>
+<h3 id="exercise-64-ints"><a class="header" href="#exercise-64-ints">Exercise 6.4: ints</a></h3>
+<h2 id="64-a-better-api-for-state-actions"><a class="header" href="#64-a-better-api-for-state-actions">6.4 A better API for state actions</a></h2>
+<p>We define <code>Rand&lt;A&gt;</code> as a type alias for <code>Fn(RNG) -&gt; (A, RNG)</code>.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>type Rand&lt;A&gt; = Box&lt;dyn Fn(Box&lt;dyn RNG&gt;) -&gt; (A, Box&lt;dyn RNG&gt;)&gt;;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-65-double-via-map"><a class="header" href="#exercise-65-double-via-map">Exercise 6.5: double via map</a></h3>
+<h3 id="exercise-66-map2"><a class="header" href="#exercise-66-map2">Exercise 6.6: map2</a></h3>
+<h3 id="exercise-67-sequence"><a class="header" href="#exercise-67-sequence">Exercise 6.7: sequence</a></h3>
+<h3 id="exercise-68-flat_map"><a class="header" href="#exercise-68-flat_map">Exercise 6.8: flat_map</a></h3>
+<h3 id="exercise-69-map-and-map2-via-flat_map"><a class="header" href="#exercise-69-map-and-map2-via-flat_map">Exercise 6.9: map and map2 via flat_map</a></h3>
+<h2 id="65-a-general-state-generic"><a class="header" href="#65-a-general-state-generic">6.5 A general State generic</a></h2>
+<p>We generalize <code>Rand</code> to <code>State&lt;S, A&gt;</code>.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct State&lt;S, A&gt;(pub Box&lt;dyn Fn(S) -&gt; (A, S)&gt;);
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-610-unit-map-map2-flat_map-sequence-for-state"><a class="header" href="#exercise-610-unit-map-map2-flat_map-sequence-for-state">Exercise 6.10: unit, map, map2, flat_map, sequence for State</a></h3>
+<h2 id="66-purely-functional-imperative-programming"><a class="header" href="#66-purely-functional-imperative-programming">6.6 Purely functional imperative programming</a></h2>
+<p>Using <code>State</code>, we can write imperative-looking code using <code>flat_map</code> chains.</p>
+<h3 id="exercise-611-candy-machine"><a class="header" href="#exercise-611-candy-machine">Exercise 6.11: Candy Machine</a></h3>
+<p>Implement a finite state automaton for a candy dispenser.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum Input {
+    Coin,
+    Turn,
+}
+
+pub struct Machine {
+    pub locked: bool,
+    pub candies: i32,
+    pub coins: i32,
+}
+<span class="boring">}</span></code></pre></pre>
+<ol start="3">
+<li>Turn locked or Coin unlocked does nothing.</li>
+<li>Machine out of candy ignores inputs.</li>
+</ol>
+<h2 id="67-references"><a class="header" href="#67-references">6.7 References</a></h2>
+<ul>
+<li><strong>Rust Book Ch 17 (State Object Pattern)</strong>: <a href="https://doc.rust-lang.org/book/ch17-03-oo-design-patterns.html">The Rust Programming Language</a></li>
+<li><strong>Rust By Example (Traits)</strong>: <a href="https://doc.rust-lang.org/rust-by-example/trait.html">Traits</a></li>
+<li><strong>Refactoring.Guru</strong>: <a href="https://refactoring.guru/design-patterns/state">State Pattern</a></li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="chapter_5_strictness_and_laziness.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="chapter_7_purely_functional_parallelism.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="chapter_5_strictness_and_laziness.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="chapter_7_purely_functional_parallelism.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

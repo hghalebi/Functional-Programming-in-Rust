@@ -1,0 +1,333 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Strictness and Laziness - Functional Programming in Rust</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="A pedagogical guide inspired by the Red Book and Rust resources.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="chapter_1_introduction.html">Introduction</a></li><li class="chapter-item expanded affix "><a href="chapter_2_getting_started.html">Getting Started</a></li><li class="chapter-item expanded affix "><a href="chapter_3_functional_data_structures.html">Functional Data Structures</a></li><li class="chapter-item expanded affix "><a href="chapter_4_handling_errors.html">Handling Errors</a></li><li class="chapter-item expanded affix "><a href="chapter_5_strictness_and_laziness.html" class="active">Strictness and Laziness</a></li><li class="chapter-item expanded affix "><a href="chapter_6_purely_functional_state.html">Purely Functional State</a></li><li class="chapter-item expanded affix "><a href="chapter_7_purely_functional_parallelism.html">Purely Functional Parallelism</a></li><li class="chapter-item expanded affix "><a href="chapter_8_property_based_testing.html">Property-Based Testing</a></li><li class="chapter-item expanded affix "><a href="chapter_9_parser_combinators.html">Parser Combinators</a></li><li class="chapter-item expanded affix "><a href="chapter_10_monoids.html">Monoids</a></li><li class="chapter-item expanded affix "><a href="chapter_11_monads.html">Monads</a></li><li class="chapter-item expanded affix "><a href="chapter_12_applicative.html">Applicative and Traversable</a></li><li class="chapter-item expanded affix "><a href="chapter_13_effects.html">External Effects and I/O</a></li><li class="chapter-item expanded affix "><a href="chapter_14_local_effects.html">Local Effects and Mutable State</a></li><li class="chapter-item expanded affix "><a href="chapter_15_streaming.html">Stream Processing</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Functional Programming in Rust</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="chapter-5-strictness-and-laziness"><a class="header" href="#chapter-5-strictness-and-laziness">Chapter 5: Strictness and Laziness</a></h1>
+<p>In this chapter, we explore <strong>non-strictness</strong> (laziness) to improve efficiency and modularity. We implement a <code>Stream</code> type that fuses sequences of transformations.</p>
+<h2 id="51-strict-and-non-strict-functions"><a class="header" href="#51-strict-and-non-strict-functions">5.1 Strict and non-strict functions</a></h2>
+<p>Strict functions evaluate their arguments <em>before</em> the function body is executed. Non-strict functions may choose not to evaluate arguments.</p>
+<p>In Rust, arguments are strictly evaluated by default. To simulate non-strictness, we can pass a closure (thunk) <code>Fn() -&gt; A</code> instead of a value <code>A</code>.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// logical AND is non-strict in the second argument
+// false &amp;&amp; { println!("!!"); true } // does not print
+<span class="boring">}</span></code></pre></pre>
+<h2 id="52-an-extended-example-lazy-lists"><a class="header" href="#52-an-extended-example-lazy-lists">5.2 An extended example: lazy lists</a></h2>
+<p>We define a <code>Stream</code> (lazy list). In Scala, <code>Cons</code> takes by-name arguments. In Rust, we use closures wrapped in <code>Rc</code> (for sharing) to represent these thunks.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::rc::Rc;
+
+#[derive(Clone)]
+pub enum Stream&lt;A&gt; {
+    Empty,
+    Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;),
+}
+// Note: We avoid memoization complexity for this basic translation. 
+// In a production Rust persistent stream, one might use `lazy_static` or `OnceCell` inside `Rc`.
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-51-to_list"><a class="header" href="#exercise-51-to_list">Exercise 5.1: to_list</a></h3>
+<p>Force the stream into a strict <code>List</code> (or <code>Vec</code>).</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// impl Stream&lt;A&gt;
+pub fn to_vec(&amp;self) -&gt; Vec&lt;A&gt; {
+    match self {
+        Stream::Empty =&gt; Vec::new(),
+        Stream::Cons(h, t) =&gt; {
+            let mut v = vec![h()];
+            v.extend(t().to_vec());
+            v
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-52-take-and-drop"><a class="header" href="#exercise-52-take-and-drop">Exercise 5.2: take and drop</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn take(&amp;self, n: usize) -&gt; Stream&lt;A&gt; {
+    if n == 0 {
+        Stream::Empty
+    } else {
+        match self {
+            Stream::Empty =&gt; Stream::Empty,
+            Stream::Cons(h, t) =&gt; {
+                let h = h.clone();
+                let t = t.clone();
+                Stream::cons(move || h(), move || t().take(n - 1))
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-53-take_while"><a class="header" href="#exercise-53-take_while">Exercise 5.3: take_while</a></h3>
+<p>Return all starting elements that match a predicate.</p>
+<h2 id="53-separating-program-description-from-evaluation"><a class="header" href="#53-separating-program-description-from-evaluation">5.3 Separating program description from evaluation</a></h2>
+<p>Laziness lets us separate the description of an expression from its evaluation.</p>
+<h3 id="exercise-54-for_all"><a class="header" href="#exercise-54-for_all">Exercise 5.4: for_all</a></h3>
+<p>Check that all elements in the Stream match a given predicate, terminating early if possible.</p>
+<h3 id="exercise-55-take_while-using-fold_right"><a class="header" href="#exercise-55-take_while-using-fold_right">Exercise 5.5: take_while using fold_right</a></h3>
+<h3 id="exercise-56-head_option-using-fold_right"><a class="header" href="#exercise-56-head_option-using-fold_right">Exercise 5.6: head_option using fold_right</a></h3>
+<h3 id="exercise-57-map-filter-append-flat_map-using-fold_right"><a class="header" href="#exercise-57-map-filter-append-flat_map-using-fold_right">Exercise 5.7: map, filter, append, flat_map using fold_right</a></h3>
+<h2 id="54-infinite-streams-and-corecursion"><a class="header" href="#54-infinite-streams-and-corecursion">5.4 Infinite streams and corecursion</a></h2>
+<p>Because functions are incremental, they work for infinite streams.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn ones() -&gt; Stream&lt;i32&gt; {
+    Stream::cons(|| 1, ones)
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-58-constant"><a class="header" href="#exercise-58-constant">Exercise 5.8: constant</a></h3>
+<h3 id="exercise-59-from"><a class="header" href="#exercise-59-from">Exercise 5.9: from</a></h3>
+<h3 id="exercise-510-fibs"><a class="header" href="#exercise-510-fibs">Exercise 5.10: fibs</a></h3>
+<h3 id="exercise-511-unfold"><a class="header" href="#exercise-511-unfold">Exercise 5.11: unfold</a></h3>
+<p>A general stream-building function (corecursion).</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn unfold&lt;A, S, F&gt;(z: S, f: F) -&gt; Stream&lt;A&gt;
+where F: Fn(S) -&gt; Option&lt;(A, S)&gt; + 'static + Clone {
+    match f(z) {
+        Some((a, s)) =&gt; {
+            let f = f.clone();
+            Stream::cons(move || a.clone(), move || unfold(s, f.clone()))
+        },
+        None =&gt; Stream::Empty,
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-512-fibs-from-constant-ones-via-unfold"><a class="header" href="#exercise-512-fibs-from-constant-ones-via-unfold">Exercise 5.12: fibs, from, constant, ones via unfold</a></h3>
+<h3 id="exercise-513-map-take-take_while-zip_with-zip_all-via-unfold"><a class="header" href="#exercise-513-map-take-take_while-zip_with-zip_all-via-unfold">Exercise 5.13: map, take, take_while, zip_with, zip_all via unfold</a></h3>
+<h3 id="exercise-514-starts_with"><a class="header" href="#exercise-514-starts_with">Exercise 5.14: starts_with</a></h3>
+<h3 id="exercise-515-tails"><a class="header" href="#exercise-515-tails">Exercise 5.15: tails</a></h3>
+<h3 id="exercise-516-scan_right"><a class="header" href="#exercise-516-scan_right">Exercise 5.16: scan_right</a></h3>
+<h2 id="55-summary"><a class="header" href="#55-summary">5.5 Summary</a></h2>
+<p>Laziness improves modularity by decoupling description from evaluation.</p>
+<h2 id="56-references"><a class="header" href="#56-references">5.6 References</a></h2>
+<ul>
+<li><strong>Rust Book Ch 13 (Iterators)</strong>: <a href="https://doc.rust-lang.org/book/ch13-02-iterators.html">The Rust Programming Language</a></li>
+<li><strong>Rust By Example (Iterators)</strong>: <a href="https://doc.rust-lang.org/rust-by-example/trait/iter.html">Iterators</a></li>
+<li><strong>Rust Patterns (Lazy Evaluation)</strong>: <a href="https://rust-unofficial.github.io/patterns/idioms/lazy-evaluation.html">Idioms</a></li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="chapter_4_handling_errors.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="chapter_6_purely_functional_state.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="chapter_4_handling_errors.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="chapter_6_purely_functional_state.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

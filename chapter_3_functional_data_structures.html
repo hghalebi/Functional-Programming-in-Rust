@@ -1,0 +1,415 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Functional Data Structures - Functional Programming in Rust</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="A pedagogical guide inspired by the Red Book and Rust resources.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="chapter_1_introduction.html">Introduction</a></li><li class="chapter-item expanded affix "><a href="chapter_2_getting_started.html">Getting Started</a></li><li class="chapter-item expanded affix "><a href="chapter_3_functional_data_structures.html" class="active">Functional Data Structures</a></li><li class="chapter-item expanded affix "><a href="chapter_4_handling_errors.html">Handling Errors</a></li><li class="chapter-item expanded affix "><a href="chapter_5_strictness_and_laziness.html">Strictness and Laziness</a></li><li class="chapter-item expanded affix "><a href="chapter_6_purely_functional_state.html">Purely Functional State</a></li><li class="chapter-item expanded affix "><a href="chapter_7_purely_functional_parallelism.html">Purely Functional Parallelism</a></li><li class="chapter-item expanded affix "><a href="chapter_8_property_based_testing.html">Property-Based Testing</a></li><li class="chapter-item expanded affix "><a href="chapter_9_parser_combinators.html">Parser Combinators</a></li><li class="chapter-item expanded affix "><a href="chapter_10_monoids.html">Monoids</a></li><li class="chapter-item expanded affix "><a href="chapter_11_monads.html">Monads</a></li><li class="chapter-item expanded affix "><a href="chapter_12_applicative.html">Applicative and Traversable</a></li><li class="chapter-item expanded affix "><a href="chapter_13_effects.html">External Effects and I/O</a></li><li class="chapter-item expanded affix "><a href="chapter_14_local_effects.html">Local Effects and Mutable State</a></li><li class="chapter-item expanded affix "><a href="chapter_15_streaming.html">Stream Processing</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Functional Programming in Rust</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="chapter-3-functional-data-structures"><a class="header" href="#chapter-3-functional-data-structures">Chapter 3: Functional data structures</a></h1>
+<p>In this chapter, we’ll learn the concept of functional data structures and how to work with them. We’ll use this as an opportunity to introduce how data types are defined in functional programming, learn about the related technique of pattern matching, and get practice writing and generalizing pure functions.</p>
+<h2 id="31-defining-functional-data-structures"><a class="header" href="#31-defining-functional-data-structures">3.1 Defining functional data structures</a></h2>
+<p>A functional data structure is operated on using only pure functions. Functional data structures are by definition immutable.</p>
+<p>In Rust, the most ubiquitous functional data structure, the singly linked list, can be defined using an <code>enum</code>. To enable <strong>data sharing</strong> (persistence) as described in functional literature, we use <code>Rc</code> (Reference Counting) instead of <code>Box</code> (unique ownership). This allows multiple lists to share the same tail segments.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::rc::Rc;
+
+#[derive(Clone, Debug)]
+pub enum List&lt;A&gt; {
+    Nil,
+    Cons(A, Rc&lt;List&lt;A&gt;&gt;),
+}
+
+use List::*;
+
+impl&lt;A&gt; Default for List&lt;A&gt; {
+    fn default() -&gt; Self {
+        Nil
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Let’s look at the definition. <code>enum List</code> has two variants: <code>Nil</code> (empty) and <code>Cons</code> (non-empty). <code>Cons</code> holds a value of type <code>A</code> and a reference-counted pointer <code>Rc</code> to the rest of the list.</p>
+<h3 id="data-sharing"><a class="header" href="#data-sharing">Data Sharing</a></h3>
+<p>When we add an element <code>1</code> to the front of an existing list <code>xs</code>, we return a new list <code>Cons(1, Rc::new(xs))</code>. We don't copy <code>xs</code>; we just reuse it. This is called data sharing. Functional data structures are <strong>persistent</strong>, meaning existing references are never changed by operations.</p>
+<h2 id="32-pattern-matching"><a class="header" href="#32-pattern-matching">3.2 Pattern matching</a></h2>
+<p>Rust supports pattern matching via <code>match</code>.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn sum(ints: &amp;List&lt;i32&gt;) -&gt; i32 {
+    match ints {
+        Nil =&gt; 0,
+        Cons(x, xs) =&gt; x + sum(xs),
+    }
+}
+
+pub fn product(ds: &amp;List&lt;f64&gt;) -&gt; f64 {
+    match ds {
+        Nil =&gt; 1.0,
+        Cons(0.0, _) =&gt; 0.0,
+        Cons(x, xs) =&gt; x * product(xs),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-31"><a class="header" href="#exercise-31">Exercise 3.1</a></h3>
+<p>What will be the result of the match expression?
+<em>Answer: The match expression in the book (translated to Rust syntax) would match the third case <code>x + y</code>, resulting in 3 (1 + 2).</em></p>
+<h2 id="33-data-sharing-in-functional-data-structures"><a class="header" href="#33-data-sharing-in-functional-data-structures">3.3 Data sharing in functional data structures</a></h2>
+<h3 id="exercise-32-tail"><a class="header" href="#exercise-32-tail">Exercise 3.2: Tail</a></h3>
+<p>Implement the function <code>tail</code> for removing the first element of a List. Note that the function takes constant time.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn tail&lt;A&gt;(l: &amp;List&lt;A&gt;) -&gt; Option&lt;&amp;Rc&lt;List&lt;A&gt;&gt;&gt; {
+    match l {
+        Nil =&gt; None,
+        Cons(_, xs) =&gt; Some(xs),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><em>Note: In Rust, returning a reference to the tail <code>&amp;Rc</code> works if we borrow the input. To return an owned persistent list, we would return <code>Rc&lt;List&lt;A&gt;&gt;</code> by cloning the pointer (cheap).</em></p>
+<h3 id="exercise-33-set-head"><a class="header" href="#exercise-33-set-head">Exercise 3.3: Set Head</a></h3>
+<p>Implement <code>set_head</code>.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn set_head&lt;A&gt;(l: &amp;List&lt;A&gt;, h: A) -&gt; List&lt;A&gt; 
+where A: Clone {
+    match l {
+        Nil =&gt; panic!("set_head on empty list"), // Or return Result
+        Cons(_, xs) =&gt; Cons(h, xs.clone()),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-34-drop"><a class="header" href="#exercise-34-drop">Exercise 3.4: Drop</a></h3>
+<p>Generalize <code>tail</code> to <code>drop</code>.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn drop&lt;A&gt;(l: &amp;List&lt;A&gt;, n: usize) -&gt; &amp;List&lt;A&gt; {
+    if n == 0 {
+        return l;
+    }
+    match l {
+        Nil =&gt; &amp;Nil,
+        Cons(_, xs) =&gt; drop(xs, n - 1),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-35-dropwhile"><a class="header" href="#exercise-35-dropwhile">Exercise 3.5: DropWhile</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn drop_while&lt;A, F&gt;(l: &amp;List&lt;A&gt;, f: F) -&gt; &amp;List&lt;A&gt; 
+where F: Fn(&amp;A) -&gt; bool {
+    match l {
+        Cons(h, t) if f(h) =&gt; drop_while(t, f),
+        _ =&gt; l,
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-36-init"><a class="header" href="#exercise-36-init">Exercise 3.6: Init</a></h3>
+<p>Implement a function <code>init</code> that returns a List consisting of all but the last element.
+<em>Why can't this be constant time? Because we must rebuild the path to the new end.</em></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn init&lt;A: Clone&gt;(l: &amp;List&lt;A&gt;) -&gt; List&lt;A&gt; {
+    match l {
+        Nil =&gt; panic!("init of empty list"),
+        Cons(_, xs) if matches!(**xs, Nil) =&gt; Nil,
+        Cons(h, xs) =&gt; Cons(h.clone(), Rc::new(init(xs))),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="34-recursion-over-lists-and-generalizing-to-higher-order-functions"><a class="header" href="#34-recursion-over-lists-and-generalizing-to-higher-order-functions">3.4 Recursion over lists and generalizing to higher-order functions</a></h2>
+<h3 id="exercise-37---315-folds"><a class="header" href="#exercise-37---315-folds">Exercise 3.7 - 3.15: Folds</a></h3>
+<p><strong>Exercise 3.9: Length using fold_right</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn length&lt;A&gt;(l: &amp;List&lt;A&gt;) -&gt; usize {
+    fold_right(l, 0, |_, acc| acc + 1)
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Exercise 3.10: Fold Left (Tail recursive)</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn fold_left&lt;A, B, F&gt;(l: &amp;List&lt;A&gt;, z: B, f: F) -&gt; B 
+where F: Fn(B, &amp;A) -&gt; B {
+    match l {
+        Nil =&gt; z,
+        Cons(h, t) =&gt; fold_left(t, f(z, h), f),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Exercise 3.12: Reverse</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn reverse&lt;A: Clone&gt;(l: &amp;List&lt;A&gt;) -&gt; List&lt;A&gt; {
+    fold_left(l, Nil, |acc, h| Cons(h.clone(), Rc::new(acc)))
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="35-trees"><a class="header" href="#35-trees">3.5 Trees</a></h2>
+<p>Algebraic data types can be used to define other data structures.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum Tree&lt;A&gt; {
+    Leaf(A),
+    Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;),
+}
+<span class="boring">}</span></code></pre></pre>
+<p><em>Note: For Trees, <code>Box</code> (unique ownership) is often sufficient unless we need DAGs or explicit sharing.</em></p>
+<h3 id="exercise-325-size"><a class="header" href="#exercise-325-size">Exercise 3.25: Size</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn size&lt;A&gt;(t: &amp;Tree&lt;A&gt;) -&gt; usize {
+    match t {
+        Tree::Leaf(_) =&gt; 1,
+        Tree::Branch(l, r) =&gt; 1 + size(l) + size(r),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-326-maximum"><a class="header" href="#exercise-326-maximum">Exercise 3.26: Maximum</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn maximum(t: &amp;Tree&lt;i32&gt;) -&gt; i32 {
+    match t {
+        Tree::Leaf(v) =&gt; *v,
+        Tree::Branch(l, r) =&gt; maximum(l).max(maximum(r)),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="exercise-328-map"><a class="header" href="#exercise-328-map">Exercise 3.28: Map</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn map&lt;A, B, F&gt;(t: &amp;Tree&lt;A&gt;, f: &amp;F) -&gt; Tree&lt;B&gt;
+where F: Fn(&amp;A) -&gt; B {
+    match t {
+        Tree::Leaf(v) =&gt; Tree::Leaf(f(v)),
+        Tree::Branch(l, r) =&gt; Tree::Branch(Box::new(map(l, f)), Box::new(map(r, f))),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="36-summary"><a class="header" href="#36-summary">3.6 Summary</a></h2>
+<p>We introduced algebraic data types (ADTs), <code>List</code> and <code>Tree</code>, and higher-order functions like <code>map</code>, <code>fold</code>, and <code>filter</code>.</p>
+<h2 id="37-references"><a class="header" href="#37-references">3.7 References</a></h2>
+<ul>
+<li><strong>Rust Book Ch 6 (Enums)</strong>: <a href="https://doc.rust-lang.org/book/ch06-00-enums.html">The Rust Programming Language</a></li>
+<li><strong>Rust Book Ch 15 (Smart Pointers/Box)</strong>: <a href="https://doc.rust-lang.org/book/ch15-00-smart-pointers.html">The Rust Programming Language</a></li>
+<li><strong>Rust By Example (Enums)</strong>: <a href="https://doc.rust-lang.org/rust-by-example/custom_types/enum.html">Custom Types</a></li>
+<li><strong>Rust By Example (LinkedList)</strong>: <a href="https://doc.rust-lang.org/rust-by-example/custom_types/enum/testcase_linked_list.html">Testcase: Linked List</a></li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="chapter_2_getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="chapter_4_handling_errors.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="chapter_2_getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="chapter_4_handling_errors.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

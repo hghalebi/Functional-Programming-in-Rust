@@ -1,0 +1,272 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Local Effects and Mutable State - Functional Programming in Rust</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="A pedagogical guide inspired by the Red Book and Rust resources.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="chapter_1_introduction.html">Introduction</a></li><li class="chapter-item expanded affix "><a href="chapter_2_getting_started.html">Getting Started</a></li><li class="chapter-item expanded affix "><a href="chapter_3_functional_data_structures.html">Functional Data Structures</a></li><li class="chapter-item expanded affix "><a href="chapter_4_handling_errors.html">Handling Errors</a></li><li class="chapter-item expanded affix "><a href="chapter_5_strictness_and_laziness.html">Strictness and Laziness</a></li><li class="chapter-item expanded affix "><a href="chapter_6_purely_functional_state.html">Purely Functional State</a></li><li class="chapter-item expanded affix "><a href="chapter_7_purely_functional_parallelism.html">Purely Functional Parallelism</a></li><li class="chapter-item expanded affix "><a href="chapter_8_property_based_testing.html">Property-Based Testing</a></li><li class="chapter-item expanded affix "><a href="chapter_9_parser_combinators.html">Parser Combinators</a></li><li class="chapter-item expanded affix "><a href="chapter_10_monoids.html">Monoids</a></li><li class="chapter-item expanded affix "><a href="chapter_11_monads.html">Monads</a></li><li class="chapter-item expanded affix "><a href="chapter_12_applicative.html">Applicative and Traversable</a></li><li class="chapter-item expanded affix "><a href="chapter_13_effects.html">External Effects and I/O</a></li><li class="chapter-item expanded affix "><a href="chapter_14_local_effects.html" class="active">Local Effects and Mutable State</a></li><li class="chapter-item expanded affix "><a href="chapter_15_streaming.html">Stream Processing</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Functional Programming in Rust</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="chapter-14-local-effects-and-mutable-state"><a class="header" href="#chapter-14-local-effects-and-mutable-state">Chapter 14: Local Effects and Mutable State</a></h1>
+<p>In functional programming, we emphasize immutability. However, some algorithms (like Quicksort, HashMaps, or graph traversals) are naturally expressed with mutable state. The types <code>ST</code> (State Thread) and <code>STRef</code> allow us to use mutable state <em>locally</em> while remaining externally pure.</p>
+<h2 id="141-purely-functional-in-place-mutation"><a class="header" href="#141-purely-functional-in-place-mutation">14.1 Purely Functional In-Place Mutation?</a></h2>
+<p>It sounds like a contradiction. How can we have mutation in a pure function?
+The key is <strong>Scope</strong>.
+If a function allocates a mutable array, modifies it, and then returns a frozen (immutable) copy (or a result derived from it), and <em>no one else</em> ever saw the mutable version, then the function is pure from the outside.</p>
+<h2 id="142-the-st-monad-in-rust"><a class="header" href="#142-the-st-monad-in-rust">14.2 The ST Monad in Rust</a></h2>
+<p>We implemented <code>ST&lt;'a, A&gt;</code> where <code>'a</code> represents the "thread" or scope of the mutation.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct ST&lt;'a, A&gt; {
+    run: Box&lt;dyn FnOnce() -&gt; A + 'a&gt;, // Closure capturing mutable 'a references
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="preventing-leakage"><a class="header" href="#preventing-leakage">Preventing Leakage</a></h3>
+<p>The danger is leaking a mutable reference:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let r = run_st(STRef::new(1)); // ERROR! Result cannot be STRef
+<span class="boring">}</span></code></pre></pre>
+<p>In Rust, we prevent this using Higher-Rank Trait Bounds (HRTB) in the <code>run_st</code> function:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait RunnableST&lt;A&gt; {
+    fn apply&lt;'a&gt;(&amp;self) -&gt; ST&lt;'a, A&gt;;
+}
+
+pub fn run_st&lt;A&gt;(st: &amp;impl RunnableST&lt;A&gt;) -&gt; A { ... }
+<span class="boring">}</span></code></pre></pre>
+<p>Because <code>run_st</code> enforces that <code>RunnableST</code> works for <em>any</em> <code>'a</code> (<code>for&lt;'a&gt;</code>), the return type <code>A</code> cannot depend on <code>'a</code>. <code>STRef&lt;'a, T&gt;</code> depends on <code>'a</code>, so it cannot be returned. <code>Vec&lt;T&gt;</code> (via <code>freeze()</code>) does <em>not</em> depend on <code>'a</code>, so it is safe to return.</p>
+<h2 id="143-comparison-with-rust-references"><a class="header" href="#143-comparison-with-rust-references">14.3 Comparison with Rust References</a></h2>
+<p>Rust's borrow checker provides similar guarantees natively:</p>
+<ul>
+<li><code>&amp;mut T</code> ensures exclusive access (effectively a local state thread).</li>
+<li>Lifetimes (<code>'a</code>) ensure references don't escape their owner.</li>
+</ul>
+<p>In a sense, <strong>Rust is the ST Monad</strong>. Every block of code with local variables is an implicit <code>ST</code> computation. However, the explicit <code>ST</code> monad is useful when we want to treat "stateful computations" as First-Class Values (e.g., to pass them around, combine them safely, or implement "Ghost Types" patterns).</p>
+<h2 id="144-conclusion"><a class="header" href="#144-conclusion">14.4 Conclusion</a></h2>
+<p>We now have the ability to write efficient, in-place algorithms (like the <code>partition</code> step of Quicksort) using the <code>ST</code> monad, wrapping them safely so they appear pure to the rest of the program.</p>
+<h2 id="145-rust-equivalents"><a class="header" href="#145-rust-equivalents">14.5 Rust Equivalents</a></h2>
+<ul>
+<li><strong>Smart Pointers</strong>: <a href="https://doc.rust-lang.org/book/ch15-00-smart-pointers.html">The Rust Book Ch 15</a></li>
+<li><strong>Interior Mutability (<code>RefCell</code>)</strong>: <a href="https://doc.rust-lang.org/book/ch15-05-interior-mutability.html">The Rust Book Ch 15.5</a></li>
+<li><strong>Lifetimes</strong>: <a href="https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html">The Rust Book Ch 10.3</a></li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="chapter_13_effects.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="chapter_15_streaming.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="chapter_13_effects.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="chapter_15_streaming.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

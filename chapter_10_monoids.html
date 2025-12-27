@@ -1,0 +1,317 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Monoids - Functional Programming in Rust</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="A pedagogical guide inspired by the Red Book and Rust resources.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="chapter_1_introduction.html">Introduction</a></li><li class="chapter-item expanded affix "><a href="chapter_2_getting_started.html">Getting Started</a></li><li class="chapter-item expanded affix "><a href="chapter_3_functional_data_structures.html">Functional Data Structures</a></li><li class="chapter-item expanded affix "><a href="chapter_4_handling_errors.html">Handling Errors</a></li><li class="chapter-item expanded affix "><a href="chapter_5_strictness_and_laziness.html">Strictness and Laziness</a></li><li class="chapter-item expanded affix "><a href="chapter_6_purely_functional_state.html">Purely Functional State</a></li><li class="chapter-item expanded affix "><a href="chapter_7_purely_functional_parallelism.html">Purely Functional Parallelism</a></li><li class="chapter-item expanded affix "><a href="chapter_8_property_based_testing.html">Property-Based Testing</a></li><li class="chapter-item expanded affix "><a href="chapter_9_parser_combinators.html">Parser Combinators</a></li><li class="chapter-item expanded affix "><a href="chapter_10_monoids.html" class="active">Monoids</a></li><li class="chapter-item expanded affix "><a href="chapter_11_monads.html">Monads</a></li><li class="chapter-item expanded affix "><a href="chapter_12_applicative.html">Applicative and Traversable</a></li><li class="chapter-item expanded affix "><a href="chapter_13_effects.html">External Effects and I/O</a></li><li class="chapter-item expanded affix "><a href="chapter_14_local_effects.html">Local Effects and Mutable State</a></li><li class="chapter-item expanded affix "><a href="chapter_15_streaming.html">Stream Processing</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Functional Programming in Rust</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="chapter-10-monoids"><a class="header" href="#chapter-10-monoids">Chapter 10: Monoids</a></h1>
+<p>In this chapter, we explore one of the simplest and most ubiquitous algebraic structures: the <strong>Monoid</strong>. This serves as our introduction to purely algebraic structures, defined solely by their operations and laws.</p>
+<h2 id="101-what-is-a-monoid"><a class="header" href="#101-what-is-a-monoid">10.1 What is a Monoid?</a></h2>
+<p>A monoid consists of:</p>
+<ol>
+<li>A type <code>A</code>.</li>
+<li>An associative binary operation <code>op(a1, a2): A</code>.</li>
+<li>An identity element <code>zero: A</code> such that <code>op(x, zero) == x</code> and <code>op(zero, x) == x</code>.</li>
+</ol>
+<p>In Rust, we can define this as a trait. Since a single type can have multiple monoid instances (e.g., integers can be a monoid under addition or multiplication), we define the trait on a struct representing the monoid logic, rather than on the data type itself (using the "type class instance" pattern).</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait Monoid&lt;A&gt; {
+    fn op(&amp;self, a1: A, a2: A) -&gt; A;
+    fn zero(&amp;self) -&gt; A;
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
+<p><strong>String Monoid</strong>: Concatenation is associative, and the empty string is the identity.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct StringMonoid;
+impl Monoid&lt;String&gt; for StringMonoid {
+    fn op(&amp;self, a1: String, a2: String) -&gt; String { a1 + &amp;a2 }
+    fn zero(&amp;self) -&gt; String { "".to_string() }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Int Addition</strong>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct IntAddition;
+impl Monoid&lt;i32&gt; for IntAddition {
+    fn op(&amp;self, a1: i32, a2: i32) -&gt; i32 { a1 + a2 }
+    fn zero(&amp;self) -&gt; i32 { 0 }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="102-folding-with-monoids"><a class="header" href="#102-folding-with-monoids">10.2 Folding with Monoids</a></h2>
+<p>Monoids are intimately related to folding lists. If we have a list of values <code>[a, b, c]</code> and a monoid for that type, we can reduce the list to a single value by combining them: <code>op(a, op(b, c))</code>.</p>
+<p>We can generalize this to <code>fold_map</code>. If we have a list of type <code>A</code>, and a function <code>f: A -&gt; B</code> where <code>B</code> has a monoid instance, we can map every element to <code>B</code> and then combine them.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn fold_map&lt;A, B, M, F&gt;(as_: Vec&lt;A&gt;, m: M, f: F) -&gt; B 
+where M: Monoid&lt;B&gt;, F: Fn(A) -&gt; B {
+    as_.into_iter().fold(m.zero(), |acc, x| m.op(acc, f(x)))
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="103-associativity-and-parallelism"><a class="header" href="#103-associativity-and-parallelism">10.3 Associativity and Parallelism</a></h2>
+<p>The associativity law (<code>op(op(a, b), c) == op(a, op(b, c))</code>) means we don't have to fold sequentially from left to right. We can use a <strong>balanced fold</strong>, splitting the list in half, reducing each half recursively, and then combining the results. This enables parallelism.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn fold_map_v&lt;A, B, M, F&gt;(v: &amp;[A], m: &amp;M, f: &amp;F) -&gt; B
+where M: Monoid&lt;B&gt;, F: Fn(&amp;A) -&gt; B + Clone, B: Clone {
+    if v.is_empty() {
+        m.zero()
+    } else if v.len() == 1 {
+        f(&amp;v[0])
+    } else {
+        let (left, right) = v.split_at(v.len() / 2);
+        let lb = fold_map_v(left, m, f);
+        let rb = fold_map_v(right, m, f);
+        m.op(lb, rb)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="104-example-word-count"><a class="header" href="#104-example-word-count">10.4 Example: Word Count</a></h2>
+<p>A practical use case for parallel folding is counting words in a large string. If we split a string in the middle, we might split a word. To handle this, we define a specialized monoid <code>WC</code> (Word Count).</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum WC {
+    Stub(String), // Partial word
+    Part(String, i32, String), // (Left partial, count of full words, Right partial)
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The monoid operation combines these parts, merging adjacent stubs to form complete words if necessary.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl Monoid&lt;WC&gt; for WCMonoid {
+    fn op(&amp;self, a1: WC, a2: WC) -&gt; WC {
+        match (a1, a2) {
+            (WC::Stub(c), WC::Stub(d)) =&gt; WC::Stub(c + &amp;d),
+            (WC::Stub(c), WC::Part(l, w, r)) =&gt; WC::Part(c + &amp;l, w, r),
+            // ... logic to merge parts ...
+        }
+    }
+    // ...
+}
+<span class="boring">}</span></code></pre></pre>
+<p>By mapping every character to a <code>WC</code> (whitespace becomes <code>Part("", 0, "")</code>, non-whitespace becomes <code>Stub(c)</code>), we can use <code>fold_map_v</code> to count words in parallel.</p>
+<h2 id="105-conclusion"><a class="header" href="#105-conclusion">10.5 Conclusion</a></h2>
+<p>Monoids provide a simple but powerful abstraction for combining values. Their laws ensure that operations like parallel folding are safe and correct. This sets the stage for more complex algebraic structures like Functors and Monads, which we will explore in the next chapters.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="chapter_9_parser_combinators.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="chapter_11_monads.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="chapter_9_parser_combinators.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="chapter_11_monads.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>
