@@ -1,0 +1,17 @@
+# Summary
+
+[Introduction](chapter_1_introduction.md)
+[Getting Started](chapter_2_getting_started.md)
+[Functional Data Structures](chapter_3_functional_data_structures.md)
+[Handling Errors](chapter_4_handling_errors.md)
+[Strictness and Laziness](chapter_5_strictness_and_laziness.md)
+[Purely Functional State](chapter_6_purely_functional_state.md)
+[Purely Functional Parallelism](chapter_7_purely_functional_parallelism.md)
+[Property-Based Testing](chapter_8_property_based_testing.md)
+[Parser Combinators](chapter_9_parser_combinators.md)
+[Monoids](chapter_10_monoids.md)
+[Monads](chapter_11_monads.md)
+[Applicative and Traversable](chapter_12_applicative.md)
+[External Effects and I/O](chapter_13_effects.md)
+[Local Effects and Mutable State](chapter_14_local_effects.md)
+[Stream Processing](chapter_15_streaming.md)

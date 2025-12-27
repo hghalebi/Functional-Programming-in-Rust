@@ -1,0 +1,14 @@
+[book]
+title = "Functional Programming in Rust"
+authors = [
+    "Hamze Ghalebi (Inspired by 'Functional Programming in Scala' and a collection of Rust online books; references in every chapter)",
+]
+description = "A pedagogical guide inspired by the Red Book and Rust resources."
+language = "en"
+multilingual = false
+src = "src"
+
+[build]
+build-dir = "book"
+
+# Use default theme
