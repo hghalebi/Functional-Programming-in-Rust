@@ -12,14 +12,14 @@ We can model an effectful computation as a value that, when "run", performs the 
 ```rust
 pub struct SimpleIO<A>(Box<dyn FnOnce() -> A>);
 
-impl<A> SimpleIO<A> {
+impl<A: 'static> SimpleIO<A> {
     pub fn new<F>(f: F) -> Self where F: FnOnce() -> A + 'static { 
         SimpleIO(Box::new(f)) 
     }
     
     pub fn run(self) -> A { (self.0)() }
     
-    pub fn flat_map<B, F>(self, f: F) -> SimpleIO<B>
+    pub fn flat_map<B: 'static, F>(self, f: F) -> SimpleIO<B>
     where F: FnOnce(A) -> SimpleIO<B> + 'static
     {
         SimpleIO::new(move || f(self.run()).run())
@@ -40,7 +40,13 @@ Since `IO` is a description, we can compose these descriptions. `IO` forms a Mon
 
 ```rust
 # struct SimpleIO<A>(Box<dyn FnOnce() -> A>);
-# impl<A> SimpleIO<A> { fn new<F>(f: F) -> Self where F: FnOnce() -> A + 'static { SimpleIO(Box::new(f)) } fn flat_map<B, F>(self, f: F) -> SimpleIO<B> where F: FnOnce(A) -> SimpleIO<B> + 'static { (self.0)(); f((self.0)()) } } // Mock
+# impl<A: 'static> SimpleIO<A> {
+#     fn new<F>(f: F) -> Self where F: FnOnce() -> A + 'static { SimpleIO(Box::new(f)) }
+#     fn run(self) -> A { (self.0)() }
+#     fn flat_map<B: 'static, F>(self, f: F) -> SimpleIO<B> where F: FnOnce(A) -> SimpleIO<B> + 'static {
+#         SimpleIO::new(move || f((self.0)()).run())
+#     }
+# }
 struct Console;
 impl Console {
     fn read_line() -> SimpleIO<String> { SimpleIO::new(|| "Bob".to_string()) }

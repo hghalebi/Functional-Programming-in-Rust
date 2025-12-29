@@ -58,7 +58,7 @@ If we have a `Tree<i32>` and we want to apply a function that might fail (return
 ```rust
 # pub trait Functor { type Wrapped<A>; fn map<A, B, F>(fa: Self::Wrapped<A>, f: F) -> Self::Wrapped<B> where F: Fn(A) -> B; }
 # pub trait Applicative: Functor { fn unit<A>(a: A) -> Self::Wrapped<A>; fn map2<A, B, C, F>(fa: Self::Wrapped<A>, fb: Self::Wrapped<B>, f: F) -> Self::Wrapped<C>; fn map<A, B, F>(fa: Self::Wrapped<A>, f: F) -> Self::Wrapped<B> where F: Fn(A) -> B; }
-# pub trait Traverse: Functor { fn traverse<G, A, B, F>(fa: Self::Wrapped<A>, f: F) -> G::Wrapped<Self::Wrapped<B>> where G: Applicative; }
+# pub trait Traverse: Functor { fn traverse<G, A, B, F>(fa: Self::Wrapped<A>, f: F) -> G::Wrapped<Self::Wrapped<B>> where G: Applicative, F: Fn(A) -> G::Wrapped<B> + Clone + 'static; }
 # enum Tree<A> { Leaf(A), Branch(Box<Tree<A>>, Box<Tree<A>>) }
 # struct TreeApp;
 # impl Functor for TreeApp { type Wrapped<A> = Tree<A>; fn map<A, B, F>(fa: Tree<A>, f: F) -> Tree<B> where F: Fn(A) -> B { match fa { Tree::Leaf(a) => Tree::Leaf(f(a)), Tree::Branch(l, r) => Tree::Branch(Box::new(Self::map(*l, &f)), Box::new(Self::map(*r, f))) } } } // Dummy impl
@@ -66,11 +66,11 @@ impl Traverse for TreeApp {
     fn traverse<G, A, B, F>(fa: Tree<A>, f: F) -> G::Wrapped<Tree<B>>
     where G: Applicative, F: Fn(A) -> G::Wrapped<B> + Clone + 'static { // Added bounds for compilation
         match fa {
-            Tree::Leaf(a) => G::map(f(a), |b| Tree::Leaf(b)),
+            Tree::Leaf(a) => <G as Functor>::map(f(a), |b| Tree::Leaf(b)),
             Tree::Branch(l, r) => {
-                let gl = Self::traverse(*l, f.clone());
-                let gr = Self::traverse(*r, f);
-                G::map2(gl, gr, |l, r| Tree::Branch(Box::new(l), Box::new(r)))
+                let gl = Self::traverse::<G, _, _, _>(*l, f.clone());
+                let gr = Self::traverse::<G, _, _, _>(*r, f);
+                G::map2(gl, gr, |l: Tree<B>, r: Tree<B>| Tree::Branch(Box::new(l), Box::new(r)))
             }
         }
     }

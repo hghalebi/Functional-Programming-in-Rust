@@ -36,8 +36,8 @@ The true power comes from `pipe`. We can feed the output of one process into the
 #     fn lift<F>(_: F) -> Process<I, O> where F: Fn(I) -> O { Process::Halt }
 #     fn pipe<O2>(self, _: Process<O, O2>) -> Process<I, O2> { Process::Halt }
 # }
-let p1 = Process::filter(|x| x % 2 == 0); // Producers/Transducers
-let p2 = Process::lift(|x: i32| x * 10);
+let p1 = Process::<i32, i32>::filter(|x| x % 2 == 0); // Producers/Transducers
+let p2 = Process::<i32, i32>::lift(|x: i32| x * 10);
 let pipeline = p1.pipe(p2); // Fused Process
 # fn main() {}
 ```

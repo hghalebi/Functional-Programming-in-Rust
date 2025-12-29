@@ -25,7 +25,7 @@ Let’s look at an example that demonstrates some of the benefits of programming
 Suppose we’re implementing a program to handle purchases at a coffee shop. We’ll begin with a Rust program that uses side effects in its implementation (also called an impure program).
 
 ```rust
-# struct Coffee { price: f64 }
+# #[derive(Clone, Copy)] struct Coffee { price: f64 }
 # impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
 # struct CreditCard;
 # impl CreditCard { fn charge(&mut self, _price: f64) {} }
@@ -52,7 +52,7 @@ But our function merely returns a `Coffee` and these other actions are happening
 As a result of this side effect, the code is difficult to test. We don’t want our tests to actually contact the credit card company and charge the card! This lack of testability is suggesting a design change: arguably, `CreditCard` shouldn’t have any knowledge baked into it about how to contact the credit card company to actually execute a charge, nor should it have knowledge of how to persist a record of this charge in our internal systems. We can make the code more modular and testable by letting `CreditCard` be ignorant of these concerns and passing a `Payments` object into `buy_coffee`.
 
 ```rust
-# struct Coffee { price: f64 }
+# #[derive(Clone, Copy)] struct Coffee { price: f64 }
 # impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
 # struct CreditCard;
 # trait Payments { fn charge(&mut self, cc: &mut CreditCard, amount: f64); }
@@ -87,7 +87,7 @@ Here’s what a functional solution might look like in Rust:
 
 ```rust
 # #[derive(Clone)] struct CreditCard;
-# struct Coffee { price: f64 }
+# #[derive(Clone, Copy)] struct Coffee { price: f64 }
 # impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
 # struct Charge { cc: CreditCard, amount: f64 }
 # impl Charge { fn new(cc: CreditCard, amount: f64) -> Self { Charge { cc, amount } } }
@@ -139,7 +139,7 @@ Now let’s look at `buy_coffees`, to implement the purchase of `n` cups of coff
 
 ```rust
 # #[derive(PartialEq, Clone)] struct CreditCard;
-# struct Coffee { price: f64 }
+# #[derive(Clone, Copy)] struct Coffee { price: f64 }
 # impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
 # #[derive(Clone)] struct Charge { cc: CreditCard, amount: f64 }
 # impl Charge { 

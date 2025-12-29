@@ -17,7 +17,7 @@ pub enum List<A> {
     Cons(A, Rc<List<A>>),
 }
 
-use List::*;
+use self::List::*;
 
 impl<A> Default for List<A> {
     fn default() -> Self {
@@ -42,7 +42,7 @@ Rust supports pattern matching via `match`.
 ```rust
 # use std::rc::Rc;
 # enum List<A> { Nil, Cons(A, Rc<List<A>>) }
-# use List::*;
+# use self::List::*;
 pub fn sum(ints: &List<i32>) -> i32 {
     match ints {
         Nil => 0,
@@ -75,7 +75,7 @@ Implement the function `tail` for removing the first element of a List. Note tha
 ```rust
 # use std::rc::Rc;
 # enum List<A> { Nil, Cons(A, Rc<List<A>>) }
-# use List::*;
+# use self::List::*;
 pub fn tail<A>(l: &List<A>) -> Option<&Rc<List<A>>> {
     match l {
         Nil => None,
@@ -95,7 +95,7 @@ Implement `set_head`.
 ```rust
 # use std::rc::Rc;
 # #[derive(Debug)] enum List<A> { Nil, Cons(A, Rc<List<A>>) }
-# use List::*;
+# use self::List::*;
 pub fn set_head<A>(l: &List<A>, h: A) -> List<A> 
 where A: Clone {
     match l {
@@ -116,7 +116,7 @@ Generalize `tail` to `drop`.
 ```rust
 # use std::rc::Rc;
 # enum List<A> { Nil, Cons(A, Rc<List<A>>) }
-# use List::*;
+# use self::List::*;
 pub fn drop<A>(l: &List<A>, n: usize) -> &List<A> {
     if n == 0 {
         return l;
@@ -133,7 +133,7 @@ pub fn drop<A>(l: &List<A>, n: usize) -> &List<A> {
 ```rust
 # use std::rc::Rc;
 # enum List<A> { Nil, Cons(A, Rc<List<A>>) }
-# use List::*;
+# use self::List::*;
 pub fn drop_while<A, F>(l: &List<A>, f: F) -> &List<A> 
 where F: Fn(&A) -> bool {
     match l {
@@ -151,7 +151,7 @@ Implement a function `init` that returns a List consisting of all but the last e
 ```rust
 # use std::rc::Rc;
 # enum List<A> { Nil, Cons(A, Rc<List<A>>) }
-# use List::*;
+# use self::List::*;
 pub fn init<A: Clone>(l: &List<A>) -> List<A> {
     match l {
         Nil => panic!("init of empty list"),
@@ -170,8 +170,8 @@ pub fn init<A: Clone>(l: &List<A>) -> List<A> {
 ```rust
 # use std::rc::Rc;
 # #[derive(Clone)] enum List<A> { Nil, Cons(A, Rc<List<A>>) }
-# use List::*;
-# fn fold_right<A, B, F>(l: &List<A>, z: B, f: F) -> B where F: Fn(&A, B) -> B + Clone { match l { Nil => z, Cons(h, t) => f(h, fold_right(t, z, f)) } } 
+# use self::List::*;
+# fn fold_right<A, B, F>(l: &List<A>, z: B, f: F) -> B where F: Fn(&A, B) -> B + Clone { match l { Nil => z, Cons(h, t) => f(h, fold_right(t, z, f.clone())) } } 
 pub fn length<A>(l: &List<A>) -> usize {
     fold_right(l, 0, |_, acc| acc + 1)
 }
@@ -182,7 +182,7 @@ pub fn length<A>(l: &List<A>) -> usize {
 ```rust
 # use std::rc::Rc;
 # #[derive(Clone)] enum List<A> { Nil, Cons(A, Rc<List<A>>) }
-# use List::*;
+# use self::List::*;
 pub fn fold_left<A, B, F>(l: &List<A>, z: B, f: F) -> B 
 where F: Fn(B, &A) -> B {
     match l {
@@ -197,7 +197,7 @@ where F: Fn(B, &A) -> B {
 ```rust
 # use std::rc::Rc;
 # #[derive(Clone)] enum List<A> { Nil, Cons(A, Rc<List<A>>) }
-# use List::*;
+# use self::List::*;
 # pub fn fold_left<A, B, F>(l: &List<A>, z: B, f: F) -> B where F: Fn(B, &A) -> B { match l { Nil => z, Cons(h, t) => fold_left(t, f(z, h), f), } }
 pub fn reverse<A: Clone>(l: &List<A>) -> List<A> {
     fold_left(l, Nil, |acc, h| Cons(h.clone(), Rc::new(acc)))

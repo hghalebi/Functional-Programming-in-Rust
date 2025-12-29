@@ -114,11 +114,11 @@ A general stream-building function (corecursion).
 # #[derive(Clone)] pub enum Stream<A> { Empty, Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> Stream<A>>) }
 # impl<A> Stream<A> { fn cons<F, S>(h: F, t: S) -> Self where F: Fn() -> A + 'static, S: Fn() -> Stream<A> + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
 pub fn unfold<A, S, F>(z: S, f: F) -> Stream<A>
-where F: Fn(S) -> Option<(A, S)> + 'static + Clone {
+where A: Clone + 'static, S: Clone + 'static, F: Fn(S) -> Option<(A, S)> + 'static + Clone {
     match f(z) {
         Some((a, s)) => {
             let f = f.clone();
-            Stream::cons(move || a.clone(), move || unfold(s, f.clone()))
+            Stream::cons(move || a.clone(), move || unfold(s.clone(), f.clone()))
         },
         None => Stream::Empty,
     }

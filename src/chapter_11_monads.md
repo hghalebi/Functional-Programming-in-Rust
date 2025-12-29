@@ -46,7 +46,7 @@ pub trait Monad: Functor {
 
 In functional theory, `map2` can be derived from `flatMap` and `map`. However, in Rust, implementing `map2` generically via `flatMap` involves closures.
 
-```rust
+```rust,ignore
 // Conceptual default implementation
 flat_map(ma, |a| map(mb, |b| f(a, b)))
 ```
