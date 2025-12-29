@@ -178,9 +178,7 @@
 <h2 id="31-defining-functional-data-structures"><a class="header" href="#31-defining-functional-data-structures">3.1 Defining functional data structures</a></h2>
 <p>A functional data structure is operated on using only pure functions. Functional data structures are by definition immutable.</p>
 <p>In Rust, the most ubiquitous functional data structure, the singly linked list, can be defined using an <code>enum</code>. To enable <strong>data sharing</strong> (persistence) as described in functional literature, we use <code>Rc</code> (Reference Counting) instead of <code>Box</code> (unique ownership). This allows multiple lists to share the same tail segments.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::rc::Rc;
+<pre><pre class="playground"><code class="language-rust">use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub enum List&lt;A&gt; {
@@ -195,14 +193,18 @@ impl&lt;A&gt; Default for List&lt;A&gt; {
         Nil
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">    let list: List&lt;i32&gt; = List::Cons(1, Rc::new(List::Nil));
+</span><span class="boring">    println!("{:?}", list);
+</span><span class="boring">}</span></code></pre></pre>
 <p>Let’s look at the definition. <code>enum List</code> has two variants: <code>Nil</code> (empty) and <code>Cons</code> (non-empty). <code>Cons</code> holds a value of type <code>A</code> and a reference-counted pointer <code>Rc</code> to the rest of the list.</p>
 <h3 id="data-sharing"><a class="header" href="#data-sharing">Data Sharing</a></h3>
 <p>When we add an element <code>1</code> to the front of an existing list <code>xs</code>, we return a new list <code>Cons(1, Rc::new(xs))</code>. We don't copy <code>xs</code>; we just reuse it. This is called data sharing. Functional data structures are <strong>persistent</strong>, meaning existing references are never changed by operations.</p>
 <h2 id="32-pattern-matching"><a class="header" href="#32-pattern-matching">3.2 Pattern matching</a></h2>
 <p>Rust supports pattern matching via <code>match</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
+</span><span class="boring">use List::*;
 </span>pub fn sum(ints: &amp;List&lt;i32&gt;) -&gt; i32 {
     match ints {
         Nil =&gt; 0,
@@ -217,27 +219,35 @@ pub fn product(ds: &amp;List&lt;f64&gt;) -&gt; f64 {
         Cons(x, xs) =&gt; x * product(xs),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">    let list = Cons(1, Rc::new(Cons(2, Rc::new(Nil))));
+</span><span class="boring">    assert_eq!(sum(&amp;list), 3);
+</span><span class="boring">}</span></code></pre></pre>
 <h3 id="exercise-31"><a class="header" href="#exercise-31">Exercise 3.1</a></h3>
 <p>What will be the result of the match expression?
 <em>Answer: The match expression in the book (translated to Rust syntax) would match the third case <code>x + y</code>, resulting in 3 (1 + 2).</em></p>
 <h2 id="33-data-sharing-in-functional-data-structures"><a class="header" href="#33-data-sharing-in-functional-data-structures">3.3 Data sharing in functional data structures</a></h2>
 <h3 id="exercise-32-tail"><a class="header" href="#exercise-32-tail">Exercise 3.2: Tail</a></h3>
 <p>Implement the function <code>tail</code> for removing the first element of a List. Note that the function takes constant time.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
+</span><span class="boring">use List::*;
 </span>pub fn tail&lt;A&gt;(l: &amp;List&lt;A&gt;) -&gt; Option&lt;&amp;Rc&lt;List&lt;A&gt;&gt;&gt; {
     match l {
         Nil =&gt; None,
         Cons(_, xs) =&gt; Some(xs),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">   let list = Cons(1, Rc::new(Nil));
+</span><span class="boring">   assert!(tail(&amp;list).is_some());
+</span><span class="boring">}</span></code></pre></pre>
 <p><em>Note: In Rust, returning a reference to the tail <code>&amp;Rc</code> works if we borrow the input. To return an owned persistent list, we would return <code>Rc&lt;List&lt;A&gt;&gt;</code> by cloning the pointer (cheap).</em></p>
 <h3 id="exercise-33-set-head"><a class="header" href="#exercise-33-set-head">Exercise 3.3: Set Head</a></h3>
 <p>Implement <code>set_head</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">#[derive(Debug)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
+</span><span class="boring">use List::*;
 </span>pub fn set_head&lt;A&gt;(l: &amp;List&lt;A&gt;, h: A) -&gt; List&lt;A&gt; 
 where A: Clone {
     match l {
@@ -245,11 +255,16 @@ where A: Clone {
         Cons(_, xs) =&gt; Cons(h, xs.clone()),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">   let list = Cons(1, Rc::new(Nil));
+</span><span class="boring">   let new_list = set_head(&amp;list, 2);
+</span><span class="boring">   // println!("{:?}", new_list); 
+</span><span class="boring">}</span></code></pre></pre>
 <h3 id="exercise-34-drop"><a class="header" href="#exercise-34-drop">Exercise 3.4: Drop</a></h3>
 <p>Generalize <code>tail</code> to <code>drop</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
+</span><span class="boring">use List::*;
 </span>pub fn drop&lt;A&gt;(l: &amp;List&lt;A&gt;, n: usize) -&gt; &amp;List&lt;A&gt; {
     if n == 0 {
         return l;
@@ -259,10 +274,11 @@ where A: Clone {
         Cons(_, xs) =&gt; drop(xs, n - 1),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-35-dropwhile"><a class="header" href="#exercise-35-dropwhile">Exercise 3.5: DropWhile</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
+</span><span class="boring">use List::*;
 </span>pub fn drop_while&lt;A, F&gt;(l: &amp;List&lt;A&gt;, f: F) -&gt; &amp;List&lt;A&gt; 
 where F: Fn(&amp;A) -&gt; bool {
     match l {
@@ -270,12 +286,13 @@ where F: Fn(&amp;A) -&gt; bool {
         _ =&gt; l,
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-36-init"><a class="header" href="#exercise-36-init">Exercise 3.6: Init</a></h3>
 <p>Implement a function <code>init</code> that returns a List consisting of all but the last element.
 <em>Why can't this be constant time? Because we must rebuild the path to the new end.</em></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
+</span><span class="boring">use List::*;
 </span>pub fn init&lt;A: Clone&gt;(l: &amp;List&lt;A&gt;) -&gt; List&lt;A&gt; {
     match l {
         Nil =&gt; panic!("init of empty list"),
@@ -283,19 +300,22 @@ where F: Fn(&amp;A) -&gt; bool {
         Cons(h, xs) =&gt; Cons(h.clone(), Rc::new(init(xs))),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="34-recursion-over-lists-and-generalizing-to-higher-order-functions"><a class="header" href="#34-recursion-over-lists-and-generalizing-to-higher-order-functions">3.4 Recursion over lists and generalizing to higher-order functions</a></h2>
 <h3 id="exercise-37---315-folds"><a class="header" href="#exercise-37---315-folds">Exercise 3.7 - 3.15: Folds</a></h3>
 <p><strong>Exercise 3.9: Length using fold_right</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">#[derive(Clone)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
+</span><span class="boring">use List::*;
+</span><span class="boring">fn fold_right&lt;A, B, F&gt;(l: &amp;List&lt;A&gt;, z: B, f: F) -&gt; B where F: Fn(&amp;A, B) -&gt; B + Clone { match l { Nil =&gt; z, Cons(h, t) =&gt; f(h, fold_right(t, z, f)) } } 
 </span>pub fn length&lt;A&gt;(l: &amp;List&lt;A&gt;) -&gt; usize {
     fold_right(l, 0, |_, acc| acc + 1)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p><strong>Exercise 3.10: Fold Left (Tail recursive)</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">#[derive(Clone)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
+</span><span class="boring">use List::*;
 </span>pub fn fold_left&lt;A, B, F&gt;(l: &amp;List&lt;A&gt;, z: B, f: F) -&gt; B 
 where F: Fn(B, &amp;A) -&gt; B {
     match l {
@@ -303,47 +323,44 @@ where F: Fn(B, &amp;A) -&gt; B {
         Cons(h, t) =&gt; fold_left(t, f(z, h), f),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p><strong>Exercise 3.12: Reverse</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">#[derive(Clone)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
+</span><span class="boring">use List::*;
+</span><span class="boring">pub fn fold_left&lt;A, B, F&gt;(l: &amp;List&lt;A&gt;, z: B, f: F) -&gt; B where F: Fn(B, &amp;A) -&gt; B { match l { Nil =&gt; z, Cons(h, t) =&gt; fold_left(t, f(z, h), f), } }
 </span>pub fn reverse&lt;A: Clone&gt;(l: &amp;List&lt;A&gt;) -&gt; List&lt;A&gt; {
     fold_left(l, Nil, |acc, h| Cons(h.clone(), Rc::new(acc)))
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="35-trees"><a class="header" href="#35-trees">3.5 Trees</a></h2>
 <p>Algebraic data types can be used to define other data structures.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum Tree&lt;A&gt; {
+<pre><pre class="playground"><code class="language-rust">pub enum Tree&lt;A&gt; {
     Leaf(A),
     Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;),
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p><em>Note: For Trees, <code>Box</code> (unique ownership) is often sufficient unless we need DAGs or explicit sharing.</em></p>
 <h3 id="exercise-325-size"><a class="header" href="#exercise-325-size">Exercise 3.25: Size</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">enum Tree&lt;A&gt; { Leaf(A), Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;) }
 </span>pub fn size&lt;A&gt;(t: &amp;Tree&lt;A&gt;) -&gt; usize {
     match t {
         Tree::Leaf(_) =&gt; 1,
         Tree::Branch(l, r) =&gt; 1 + size(l) + size(r),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-326-maximum"><a class="header" href="#exercise-326-maximum">Exercise 3.26: Maximum</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">enum Tree&lt;A&gt; { Leaf(A), Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;) }
 </span>pub fn maximum(t: &amp;Tree&lt;i32&gt;) -&gt; i32 {
     match t {
         Tree::Leaf(v) =&gt; *v,
         Tree::Branch(l, r) =&gt; maximum(l).max(maximum(r)),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-328-map"><a class="header" href="#exercise-328-map">Exercise 3.28: Map</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">enum Tree&lt;A&gt; { Leaf(A), Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;) }
 </span>pub fn map&lt;A, B, F&gt;(t: &amp;Tree&lt;A&gt;, f: &amp;F) -&gt; Tree&lt;B&gt;
 where F: Fn(&amp;A) -&gt; B {
     match t {
@@ -351,7 +368,7 @@ where F: Fn(&amp;A) -&gt; B {
         Tree::Branch(l, r) =&gt; Tree::Branch(Box::new(map(l, f)), Box::new(map(r, f))),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="36-summary"><a class="header" href="#36-summary">3.6 Summary</a></h2>
 <p>We introduced algebraic data types (ADTs), <code>List</code> and <code>Tree</code>, and higher-order functions like <code>map</code>, <code>fold</code>, and <code>filter</code>.</p>
 <h2 id="37-references"><a class="header" href="#37-references">3.7 References</a></h2>

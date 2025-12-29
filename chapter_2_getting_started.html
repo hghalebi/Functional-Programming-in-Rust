@@ -190,7 +190,7 @@ pub mod my_module {
         }
     }
 
-    fn format_abs(x: i32) -&gt; String {
+    pub fn format_abs(x: i32) -&gt; String {
         let msg = "The absolute value of {} is {}";
         format!(msg, x, abs(x))
     }
@@ -198,7 +198,10 @@ pub mod my_module {
     pub fn main() {
         println!("{}", format_abs(-42));
     }
-}</code></pre></pre>
+}
+<span class="boring">fn main() {
+</span><span class="boring">    my_module::main();
+</span><span class="boring">}</span></code></pre></pre>
 <p>We declare a module <code>my_module</code>. This is simply to give our code a place to live. Rust code is organized into modules (<code>mod</code>) and creates (structs, enums).</p>
 <p>The <code>abs</code> function is a pure function that takes an integer and returns its absolute value. Note the absence of an explicit <code>return</code> keyword. The value returned from a function is simply whatever value results from evaluating the last expression in the block.</p>
 <h2 id="22-running-our-program"><a class="header" href="#22-running-our-program">2.2 Running our program</a></h2>
@@ -209,9 +212,7 @@ pub mod my_module {
 <p>Functions are values. They can be assigned to variables, stored in data structures, and passed as arguments to functions.</p>
 <h3 id="231-a-short-detour-writing-loops-functionally"><a class="header" href="#231-a-short-detour-writing-loops-functionally">2.3.1 A short detour: writing loops functionally</a></h3>
 <p>First, let’s write <code>factorial</code>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>fn factorial(n: i32) -&gt; i32 {
+<pre><pre class="playground"><code class="language-rust">fn factorial(n: i32) -&gt; i32 {
     fn go(n: i32, acc: i32) -&gt; i32 {
         if n &lt;= 0 {
             acc
@@ -221,13 +222,13 @@ pub mod my_module {
     }
     go(n, 1)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">    assert_eq!(factorial(5), 120);
+</span><span class="boring">}</span></code></pre></pre>
 <p>The way we write loops functionally, without mutating a loop variable, is with a recursive function. Rust supports recursion, though it does not guarantee <strong>tail call elimination</strong> (TCO) in the same way Scala or Scheme might. For deep recursion, Rust programmers often use <code>loop</code>, <code>while</code>, or iterators to avoid blowing the stack. However, for the sake of learning FP concepts, we will use recursion here.</p>
 <h3 id="exercise-21"><a class="header" href="#exercise-21">Exercise 2.1</a></h3>
 <p>Write a recursive function to get the <code>n</code>th Fibonacci number. The first two Fibonacci numbers are 0 and 1. The <code>n</code>th number is always the sum of the previous two.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub fn fib(n: u32) -&gt; u32 {
+<pre><pre class="playground"><code class="language-rust">pub fn fib(n: u32) -&gt; u32 {
     fn go(n: u32, prev: u32, curr: u32) -&gt; u32 {
         if n == 0 {
             prev
@@ -237,22 +238,26 @@ pub mod my_module {
     }
     go(n, 0, 1)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">    assert_eq!(fib(0), 0);
+</span><span class="boring">    assert_eq!(fib(1), 1);
+</span><span class="boring">    assert_eq!(fib(5), 5);
+</span><span class="boring">    assert_eq!(fib(6), 8);
+</span><span class="boring">}</span></code></pre></pre>
 <h3 id="232-writing-our-first-higher-order-function"><a class="header" href="#232-writing-our-first-higher-order-function">2.3.2 Writing our first higher-order function</a></h3>
 <p>We can generalize <code>format_abs</code> and <code>format_factorial</code> to a single function <code>format_result</code>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>fn format_result(name: &amp;str, n: i32, f: fn(i32) -&gt; i32) -&gt; String {
+<pre><pre class="playground"><code class="language-rust">fn format_result(name: &amp;str, n: i32, f: fn(i32) -&gt; i32) -&gt; String {
     format!("The {} of {} is {}.", name, n, f(n))
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">    fn double(x: i32) -&gt; i32 { x * 2 }
+</span><span class="boring">    println!("{}", format_result("double", 21, double));
+</span><span class="boring">}</span></code></pre></pre>
 <p><code>f</code> is a function pointer or closure trait. Here we use <code>fn(i32) -&gt; i32</code>, which is a function pointer.</p>
 <h2 id="24-polymorphic-functions-abstracting-over-types"><a class="header" href="#24-polymorphic-functions-abstracting-over-types">2.4 Polymorphic functions: abstracting over types</a></h2>
 <p>We can write functions that work for any type.</p>
 <h3 id="241-an-example-of-a-polymorphic-function"><a class="header" href="#241-an-example-of-a-polymorphic-function">2.4.1 An example of a polymorphic function</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>fn find_first&lt;A, F&gt;(as_slice: &amp;[A], p: F) -&gt; Option&lt;usize&gt; 
+<pre><pre class="playground"><code class="language-rust">fn find_first&lt;A, F&gt;(as_slice: &amp;[A], p: F) -&gt; Option&lt;usize&gt; 
 where F: Fn(&amp;A) -&gt; bool {
     let mut n = 0;
     while n &lt; as_slice.len() {
@@ -263,13 +268,14 @@ where F: Fn(&amp;A) -&gt; bool {
     }
     None
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">    let data = vec![1, 2, 3, 4, 5];
+</span><span class="boring">    assert_eq!(find_first(&amp;data, |x| *x == 3), Some(2));
+</span><span class="boring">}</span></code></pre></pre>
 <p>Here, <code>A</code> is a generic type parameter. <code>F</code> is a generic type bounded by the <code>Fn</code> trait.</p>
 <h3 id="exercise-22"><a class="header" href="#exercise-22">Exercise 2.2</a></h3>
 <p>Implement <code>is_sorted</code>, which checks whether a slice <code>&amp;[A]</code> is sorted according to a given comparison function.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub fn is_sorted&lt;A, F&gt;(as_slice: &amp;[A], ordered: F) -&gt; bool 
+<pre><pre class="playground"><code class="language-rust">pub fn is_sorted&lt;A, F&gt;(as_slice: &amp;[A], ordered: F) -&gt; bool 
 where F: Fn(&amp;A, &amp;A) -&gt; bool {
     let mut n = 0;
     while n + 1 &lt; as_slice.len() {
@@ -280,14 +286,15 @@ where F: Fn(&amp;A, &amp;A) -&gt; bool {
     }
     true
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">    assert!(is_sorted(&amp;[1, 2, 3], |a, b| a &lt;= b));
+</span><span class="boring">    assert!(!is_sorted(&amp;[1, 3, 2], |a, b| a &lt;= b));
+</span><span class="boring">}</span></code></pre></pre>
 <h2 id="25-following-types-to-implementations"><a class="header" href="#25-following-types-to-implementations">2.5 Following types to implementations</a></h2>
 <h3 id="exercise-23-currying"><a class="header" href="#exercise-23-currying">Exercise 2.3 (Currying)</a></h3>
 <p>Currying converts a function <code>f</code> of two arguments into a function of one argument that partially applies <code>f</code>.
 Note: In Rust, returning closures involving references or generics can be complex due to lifetimes. We use <code>impl Fn</code> (existential type) to return a closure.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub fn curry&lt;A, B, C, F&gt;(f: F) -&gt; impl Fn(A) -&gt; Box&lt;dyn Fn(B) -&gt; C&gt;
+<pre><pre class="playground"><code class="language-rust">pub fn curry&lt;A, B, C, F&gt;(f: F) -&gt; impl Fn(A) -&gt; Box&lt;dyn Fn(B) -&gt; C&gt;
 where
     A: 'static + Clone,
     B: 'static,
@@ -299,12 +306,15 @@ where
         Box::new(move |b: B| f(a.clone(), b))
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">    let add = |a, b| a + b;
+</span><span class="boring">    let curried_add = curry(add);
+</span><span class="boring">    let add_5 = curried_add(5);
+</span><span class="boring">    assert_eq!(add_5(3), 8);
+</span><span class="boring">}</span></code></pre></pre>
 <p><em>Note: This strictly follows the type signature but requires allocation (<code>Box</code>) and cloning to satisfy the borrow checker for arbitrary <code>A</code>, <code>B</code>. In idiomatic Rust, we rarely "curry" manually, but the concept stands.</em></p>
 <h3 id="exercise-24-uncurry"><a class="header" href="#exercise-24-uncurry">Exercise 2.4 (Uncurry)</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub fn uncurry&lt;A, B, C, F&gt;(f: F) -&gt; impl Fn(A, B) -&gt; C
+<pre><pre class="playground"><code class="language-rust">pub fn uncurry&lt;A, B, C, F&gt;(f: F) -&gt; impl Fn(A, B) -&gt; C
 where
     F: Fn(A) -&gt; Box&lt;dyn Fn(B) -&gt; C&gt; + 'static,
 {
@@ -313,12 +323,10 @@ where
         g(b)
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {} // Usage requires curry to be useful test</span></code></pre></pre>
 <h3 id="exercise-25-compose"><a class="header" href="#exercise-25-compose">Exercise 2.5 (Compose)</a></h3>
 <p>Implement the higher-order function that composes two functions.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub fn compose&lt;A, B, C, F, G&gt;(f: F, g: G) -&gt; impl Fn(A) -&gt; C
+<pre><pre class="playground"><code class="language-rust">pub fn compose&lt;A, B, C, F, G&gt;(f: F, g: G) -&gt; impl Fn(A) -&gt; C
 where
     F: Fn(B) -&gt; C + 'static,
     G: Fn(A) -&gt; B + 'static,
@@ -326,7 +334,12 @@ where
 {
     move |a: A| f(g(a))
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">   let f = |x| x + 1;
+</span><span class="boring">   let g = |x| x * 2;
+</span><span class="boring">   let h = compose(f, g);
+</span><span class="boring">   assert_eq!(h(5), 11);
+</span><span class="boring">}</span></code></pre></pre>
 <h2 id="26-summary"><a class="header" href="#26-summary">2.6 Summary</a></h2>
 <p>We introduced Rust syntax, recursion, higher-order functions (HOFs), and polymorphism.</p>
 <h2 id="27-references"><a class="header" href="#27-references">2.7 References</a></h2>

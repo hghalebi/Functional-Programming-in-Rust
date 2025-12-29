@@ -185,23 +185,25 @@ Standard functional <code>List</code> separates them but requires loading all da
 <li><strong>Await</strong> a value of type <code>I</code> and transition to a new state.</li>
 <li><strong>Halt</strong>.</li>
 </ol>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum Process&lt;I, O&gt; {
+<pre><pre class="playground"><code class="language-rust">pub enum Process&lt;I, O&gt; {
     Emit(O, Box&lt;Process&lt;I, O&gt;&gt;),
     Await(Box&lt;dyn FnOnce(Option&lt;I&gt;) -&gt; Process&lt;I, O&gt;&gt;),
     Halt,
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>This is a <strong>Pull-based</strong> stream. The driver calls the process; if the process is <code>Emit</code>ting, the driver collects the value. If the process is <code>Await</code>ing, the driver fetches inputs (e.g., from a file) and feeds them in.</p>
 <h2 id="153-composition-the-pipe-"><a class="header" href="#153-composition-the-pipe-">15.3 Composition: The Pipe (<code>|&gt;</code>)</a></h2>
 <p>The true power comes from <code>pipe</code>. We can feed the output of one process into the input of another.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">enum Process&lt;I, O&gt; { Emit(O, Box&lt;Process&lt;I, O&gt;&gt;), Await(Box&lt;dyn FnOnce(Option&lt;I&gt;) -&gt; Process&lt;I, O&gt;&gt;), Halt }
+</span><span class="boring">impl&lt;I, O&gt; Process&lt;I, O&gt; {
+</span><span class="boring">    fn filter&lt;F&gt;(_: F) -&gt; Process&lt;I, I&gt; where F: Fn(&amp;I) -&gt; bool { Process::Halt }
+</span><span class="boring">    fn lift&lt;F&gt;(_: F) -&gt; Process&lt;I, O&gt; where F: Fn(I) -&gt; O { Process::Halt }
+</span><span class="boring">    fn pipe&lt;O2&gt;(self, _: Process&lt;O, O2&gt;) -&gt; Process&lt;I, O2&gt; { Process::Halt }
+</span><span class="boring">}
 </span>let p1 = Process::filter(|x| x % 2 == 0); // Producers/Transducers
-let p2 = Process::lift(|x| x * 10);
+let p2 = Process::lift(|x: i32| x * 10);
 let pipeline = p1.pipe(p2); // Fused Process
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>The <code>pipe</code> implementation fuses the two machines into one. It runs <code>p2</code> until <code>p2</code> awaits input, then run <code>p1</code> to produce that input. This ensures <strong>constant memory usage</strong> (processing one element at a time) for arbitrary pipelines.</p>
 <h2 id="154-conclusion"><a class="header" href="#154-conclusion">15.4 Conclusion</a></h2>
 <p>This architecture (often called <strong>Iteratees</strong>, <strong>Transducers</strong>, or <strong>Pull Streams</strong>) is the foundation of modern functional streaming libraries like <code>fs2</code> (Scala) or <code>futures::Stream</code> (Rust). It allows us to process infinite streams or massive files with the same elegance as operating on small lists.</p>

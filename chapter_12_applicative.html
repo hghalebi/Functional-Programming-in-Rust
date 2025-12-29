@@ -178,8 +178,7 @@
 <h2 id="121-applicative-functors"><a class="header" href="#121-applicative-functors">12.1 Applicative Functors</a></h2>
 <p>A Monad is defined by <code>unit</code> and <code>flatMap</code>.
 An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>apply</code>).</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Functor { type Wrapped&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
 </span>pub trait Applicative: Functor {
     fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;; // Same as Monad
     
@@ -189,7 +188,7 @@ An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>a
         f: F
     ) -&gt; Self::Wrapped&lt;C&gt;;
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="why-applicative"><a class="header" href="#why-applicative">Why Applicative?</a></h3>
 <p>If we look at <code>map2</code> vs <code>flatMap</code>:</p>
 <ul>
@@ -205,8 +204,8 @@ An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>a
 <h2 id="122-traversable-functors"><a class="header" href="#122-traversable-functors">12.2 Traversable Functors</a></h2>
 <p>We've seen <code>traverse</code> and <code>sequence</code> for List, Option, and Map. We can abstract this into a <strong>Traverse</strong> trait.</p>
 <p>A Traversable functor allows us to iterate over a data structure (like a Tree or List) while maintaining an effect (Applicative) context.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Functor { type Wrapped&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
+</span><span class="boring">pub trait Applicative: Functor { fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;; fn map2&lt;A, B, C, F&gt;(fa: Self::Wrapped&lt;A&gt;, fb: Self::Wrapped&lt;B&gt;, f: F) -&gt; Self::Wrapped&lt;C&gt;; }
 </span>pub trait Traverse: Functor { // actually extends Functor and Foldable conceptually
     fn traverse&lt;G, A, B, F&gt;(
         fa: Self::Wrapped&lt;A&gt;,
@@ -214,14 +213,18 @@ An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>a
     ) -&gt; G::Wrapped&lt;Self::Wrapped&lt;B&gt;&gt;
     where G: Applicative;
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="example-tree-traversal"><a class="header" href="#example-tree-traversal">Example: Tree Traversal</a></h3>
 <p>If we have a <code>Tree&lt;i32&gt;</code> and we want to apply a function that might fail (returning <code>Option&lt;i32&gt;</code>) to every node, <code>traverse</code> will give us <code>Option&lt;Tree&lt;i32&gt;&gt;</code>. It turns the "Tree of Options" into an "Option of Tree".</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Functor { type Wrapped&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
+</span><span class="boring">pub trait Applicative: Functor { fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;; fn map2&lt;A, B, C, F&gt;(fa: Self::Wrapped&lt;A&gt;, fb: Self::Wrapped&lt;B&gt;, f: F) -&gt; Self::Wrapped&lt;C&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
+</span><span class="boring">pub trait Traverse: Functor { fn traverse&lt;G, A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; G::Wrapped&lt;Self::Wrapped&lt;B&gt;&gt; where G: Applicative; }
+</span><span class="boring">enum Tree&lt;A&gt; { Leaf(A), Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;) }
+</span><span class="boring">struct TreeApp;
+</span><span class="boring">impl Functor for TreeApp { type Wrapped&lt;A&gt; = Tree&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Tree&lt;A&gt;, f: F) -&gt; Tree&lt;B&gt; where F: Fn(A) -&gt; B { match fa { Tree::Leaf(a) =&gt; Tree::Leaf(f(a)), Tree::Branch(l, r) =&gt; Tree::Branch(Box::new(Self::map(*l, &amp;f)), Box::new(Self::map(*r, f))) } } } // Dummy impl
 </span>impl Traverse for TreeApp {
     fn traverse&lt;G, A, B, F&gt;(fa: Tree&lt;A&gt;, f: F) -&gt; G::Wrapped&lt;Tree&lt;B&gt;&gt;
-    where G: Applicative, ... {
+    where G: Applicative, F: Fn(A) -&gt; G::Wrapped&lt;B&gt; + Clone + 'static { // Added bounds for compilation
         match fa {
             Tree::Leaf(a) =&gt; G::map(f(a), |b| Tree::Leaf(b)),
             Tree::Branch(l, r) =&gt; {
@@ -232,7 +235,7 @@ An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>a
         }
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="123-conclusion"><a class="header" href="#123-conclusion">12.3 Conclusion</a></h2>
 <p>Applicative and Traversable complete our tour of the core functional type classes. They allow us to write extremely generic code for data manipulation, separating the <em>mechanism</em> of the effect (Option, Result, Async) from the <em>structure</em> of the data (List, Tree, Map). In Rust, using generic traits and GATs allows us to express these powerful abstractions in a type-safe way.</p>
 

@@ -181,27 +181,26 @@ The key is <strong>Scope</strong>.
 If a function allocates a mutable array, modifies it, and then returns a frozen (immutable) copy (or a result derived from it), and <em>no one else</em> ever saw the mutable version, then the function is pure from the outside.</p>
 <h2 id="142-the-st-monad-in-rust"><a class="header" href="#142-the-st-monad-in-rust">14.2 The ST Monad in Rust</a></h2>
 <p>We implemented <code>ST&lt;'a, A&gt;</code> where <code>'a</code> represents the "thread" or scope of the mutation.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct ST&lt;'a, A&gt; {
+<pre><pre class="playground"><code class="language-rust">pub struct ST&lt;'a, A&gt; {
     run: Box&lt;dyn FnOnce() -&gt; A + 'a&gt;, // Closure capturing mutable 'a references
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="preventing-leakage"><a class="header" href="#preventing-leakage">Preventing Leakage</a></h3>
 <p>The danger is leaking a mutable reference:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust compile_fail"><span class="boring">struct STRef&lt;'a, T&gt;(std::marker::PhantomData&lt;&amp;'a T&gt;);
+</span><span class="boring">impl&lt;'a, T&gt; STRef&lt;'a, T&gt; { fn new(_: T) -&gt; Self { STRef(std::marker::PhantomData) } }
+</span><span class="boring">struct ST&lt;'a, A&gt;(std::marker::PhantomData&lt;&amp;'a A&gt;);
+</span><span class="boring">fn run_st&lt;A&gt;(_: STRef) { }
 </span>let r = run_st(STRef::new(1)); // ERROR! Result cannot be STRef
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>In Rust, we prevent this using Higher-Rank Trait Bounds (HRTB) in the <code>run_st</code> function:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct ST&lt;'a, A&gt;(std::marker::PhantomData&lt;&amp;'a A&gt;);
 </span>pub trait RunnableST&lt;A&gt; {
     fn apply&lt;'a&gt;(&amp;self) -&gt; ST&lt;'a, A&gt;;
 }
 
-pub fn run_st&lt;A&gt;(st: &amp;impl RunnableST&lt;A&gt;) -&gt; A { ... }
-<span class="boring">}</span></code></pre></pre>
+pub fn run_st&lt;A&gt;(st: &amp;impl RunnableST&lt;A&gt;) -&gt; A { unimplemented!() }
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>Because <code>run_st</code> enforces that <code>RunnableST</code> works for <em>any</em> <code>'a</code> (<code>for&lt;'a&gt;</code>), the return type <code>A</code> cannot depend on <code>'a</code>. <code>STRef&lt;'a, T&gt;</code> depends on <code>'a</code>, so it cannot be returned. <code>Vec&lt;T&gt;</code> (via <code>freeze()</code>) does <em>not</em> depend on <code>'a</code>, so it is safe to return.</p>
 <h2 id="143-comparison-with-rust-references"><a class="header" href="#143-comparison-with-rust-references">14.3 Comparison with Rust References</a></h2>
 <p>Rust's borrow checker provides similar guarantees natively:</p>

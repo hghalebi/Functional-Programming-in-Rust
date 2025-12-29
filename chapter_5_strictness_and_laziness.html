@@ -185,9 +185,7 @@
 <span class="boring">}</span></code></pre></pre>
 <h2 id="52-an-extended-example-lazy-lists"><a class="header" href="#52-an-extended-example-lazy-lists">5.2 An extended example: lazy lists</a></h2>
 <p>We define a <code>Stream</code> (lazy list). In Scala, <code>Cons</code> takes by-name arguments. In Rust, we use closures wrapped in <code>Rc</code> (for sharing) to represent these thunks.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::rc::Rc;
+<pre><pre class="playground"><code class="language-rust">use std::rc::Rc;
 
 #[derive(Clone)]
 pub enum Stream&lt;A&gt; {
@@ -196,41 +194,45 @@ pub enum Stream&lt;A&gt; {
 }
 // Note: We avoid memoization complexity for this basic translation. 
 // In a production Rust persistent stream, one might use `lazy_static` or `OnceCell` inside `Rc`.
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {
+</span><span class="boring">   // verify basic construction
+</span><span class="boring">   let _ = Stream::Cons(Rc::new(|| 1), Rc::new(|| Stream::Empty));
+</span><span class="boring">}</span></code></pre></pre>
 <h3 id="exercise-51-to_list"><a class="header" href="#exercise-51-to_list">Exercise 5.1: to_list</a></h3>
 <p>Force the stream into a strict <code>List</code> (or <code>Vec</code>).</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">#[derive(Clone)] pub enum Stream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;) }
 </span>// impl Stream&lt;A&gt;
-pub fn to_vec(&amp;self) -&gt; Vec&lt;A&gt; {
-    match self {
+pub fn to_vec&lt;A&gt;(s: &amp;Stream&lt;A&gt;) -&gt; Vec&lt;A&gt; { // Changed &amp;self to s: &amp;Stream&lt;A&gt; for standalone function
+    match s {
         Stream::Empty =&gt; Vec::new(),
         Stream::Cons(h, t) =&gt; {
             let mut v = vec![h()];
-            v.extend(t().to_vec());
+            v.extend(to_vec(&amp;t()));
             v
         }
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-52-take-and-drop"><a class="header" href="#exercise-52-take-and-drop">Exercise 5.2: take and drop</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub fn take(&amp;self, n: usize) -&gt; Stream&lt;A&gt; {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">#[derive(Clone)] pub enum Stream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;) }
+</span><span class="boring">impl&lt;A&gt; Stream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; Stream&lt;A&gt; + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
+</span>pub fn take&lt;A: 'static&gt;(s: &amp;Stream&lt;A&gt;, n: usize) -&gt; Stream&lt;A&gt; {
     if n == 0 {
         Stream::Empty
     } else {
-        match self {
+        match s {
             Stream::Empty =&gt; Stream::Empty,
             Stream::Cons(h, t) =&gt; {
                 let h = h.clone();
                 let t = t.clone();
-                Stream::cons(move || h(), move || t().take(n - 1))
+                Stream::cons(move || h(), move || take(&amp;t(), n - 1))
             }
         }
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-53-take_while"><a class="header" href="#exercise-53-take_while">Exercise 5.3: take_while</a></h3>
 <p>Return all starting elements that match a predicate.</p>
 <h2 id="53-separating-program-description-from-evaluation"><a class="header" href="#53-separating-program-description-from-evaluation">5.3 Separating program description from evaluation</a></h2>
@@ -242,19 +244,21 @@ pub fn to_vec(&amp;self) -&gt; Vec&lt;A&gt; {
 <h3 id="exercise-57-map-filter-append-flat_map-using-fold_right"><a class="header" href="#exercise-57-map-filter-append-flat_map-using-fold_right">Exercise 5.7: map, filter, append, flat_map using fold_right</a></h3>
 <h2 id="54-infinite-streams-and-corecursion"><a class="header" href="#54-infinite-streams-and-corecursion">5.4 Infinite streams and corecursion</a></h2>
 <p>Because functions are incremental, they work for infinite streams.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">#[derive(Clone)] pub enum Stream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;) }
+</span><span class="boring">impl&lt;A&gt; Stream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; Stream&lt;A&gt; + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
 </span>pub fn ones() -&gt; Stream&lt;i32&gt; {
     Stream::cons(|| 1, ones)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-58-constant"><a class="header" href="#exercise-58-constant">Exercise 5.8: constant</a></h3>
 <h3 id="exercise-59-from"><a class="header" href="#exercise-59-from">Exercise 5.9: from</a></h3>
 <h3 id="exercise-510-fibs"><a class="header" href="#exercise-510-fibs">Exercise 5.10: fibs</a></h3>
 <h3 id="exercise-511-unfold"><a class="header" href="#exercise-511-unfold">Exercise 5.11: unfold</a></h3>
 <p>A general stream-building function (corecursion).</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">#[derive(Clone)] pub enum Stream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;) }
+</span><span class="boring">impl&lt;A&gt; Stream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; Stream&lt;A&gt; + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
 </span>pub fn unfold&lt;A, S, F&gt;(z: S, f: F) -&gt; Stream&lt;A&gt;
 where F: Fn(S) -&gt; Option&lt;(A, S)&gt; + 'static + Clone {
     match f(z) {
@@ -265,7 +269,7 @@ where F: Fn(S) -&gt; Option&lt;(A, S)&gt; + 'static + Clone {
         None =&gt; Stream::Empty,
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-512-fibs-from-constant-ones-via-unfold"><a class="header" href="#exercise-512-fibs-from-constant-ones-via-unfold">Exercise 5.12: fibs, from, constant, ones via unfold</a></h3>
 <h3 id="exercise-513-map-take-take_while-zip_with-zip_all-via-unfold"><a class="header" href="#exercise-513-map-take-take_while-zip_with-zip_all-via-unfold">Exercise 5.13: map, take, take_while, zip_with, zip_all via unfold</a></h3>
 <h3 id="exercise-514-starts_with"><a class="header" href="#exercise-514-starts_with">Exercise 5.14: starts_with</a></h3>

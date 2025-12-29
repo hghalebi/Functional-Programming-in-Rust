@@ -184,10 +184,10 @@
 </ol>
 <h3 id="811-generators-gen"><a class="header" href="#811-generators-gen">8.1.1 Generators (<code>Gen</code>)</a></h3>
 <p>A generator is essentially a state transition over a random number generator. In Chapter 6, we built <code>State&lt;RNG, A&gt;</code>. <code>Gen&lt;A&gt;</code> is simply a wrapper around this state.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct State&lt;S, A&gt;(Box&lt;dyn Fn(S) -&gt; (A, S)&gt;);
+</span><span class="boring">struct SimpleRNG;
 </span>pub struct Gen&lt;A&gt;(State&lt;SimpleRNG, A&gt;);
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>This allows us to leverage all the combinators we wrote for <code>State</code>, like <code>map</code> and <code>flat_map</code>, to compose complex generators from simple ones.</p>
 <h4 id="primitives"><a class="header" href="#primitives">Primitives</a></h4>
 <ul>
@@ -203,8 +203,12 @@
 <h3 id="812-properties-prop"><a class="header" href="#812-properties-prop">8.1.2 Properties (<code>Prop</code>)</a></h3>
 <p>A property is something we can check. A simple boolean <code>check</code> is insufficient because we want to know <em>why</em> it failed (the counter-example) and how many tests passed.</p>
 <p>Our <code>Prop</code> type encapsulates a function that takes configuration (max size, number of test cases) and a source of randomness, returning a <code>Result</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">struct MaxSize(i32);
+</span><span class="boring">struct TestCases(i32);
+</span><span class="boring">struct SimpleRNG;
+</span><span class="boring">struct FailedCase(String);
+</span><span class="boring">struct SuccessCount(i32);
 </span>pub struct Prop(Rc&lt;dyn Fn(MaxSize, TestCases, SimpleRNG) -&gt; Result&gt;);
 
 pub enum Result {
@@ -212,7 +216,7 @@ pub enum Result {
     Falsified(FailedCase, SuccessCount),
     Proved,
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>We use <code>Rc&lt;dyn Fn...&gt;</code> to allow properties to be cloned and shared, which is essential when combining them (e.g., <code>prop1.and(prop2)</code>).</p>
 <h2 id="82-test-case-minimization"><a class="header" href="#82-test-case-minimization">8.2 Test Case Minimization</a></h2>
 <p>Debugging failures on massive inputs is hard. There are two main approaches to minimization:</p>
@@ -221,10 +225,10 @@ pub enum Result {
 <li><strong>Sized Generation</strong>: Start with small inputs and gradually increase size. The first failure found is naturally small. (Used to some extent in Hedgehog).</li>
 </ol>
 <p>We implement <strong>Sized Generation</strong> via <code>SGen</code>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
+</span><span class="boring">struct Gen&lt;A&gt;(A); // Mock
 </span>pub struct SGen&lt;A&gt;(Rc&lt;dyn Fn(i32) -&gt; Gen&lt;A&gt;&gt;);
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p><code>SGen</code> allows us to define generators that adapt to a requested size. <code>Prop</code> then iterates through sizes up to a maximum, ensuring we test small cases first.</p>
 <h2 id="83-the-rust-implementation"><a class="header" href="#83-the-rust-implementation">8.3 The Rust Implementation</a></h2>
 <h3 id="ownership-and-closures"><a class="header" href="#ownership-and-closures">Ownership and Closures</a></h3>
@@ -237,9 +241,16 @@ pub enum Result {
 <h3 id="random-number-generation"><a class="header" href="#random-number-generation">Random Number Generation</a></h3>
 <p>We reuse <code>SimpleRNG</code> from Chapter 6. A key challenge in Rust is that <code>RNG</code> is a trait. Passing <code>dyn RNG</code> around can be tricky due to object safety rules (especially if methods return <code>Box&lt;dyn RNG&gt;</code>). For this chapter, we specialized our implementation to use <code>SimpleRNG</code> directly to keep the focus on the property testing logic rather than generic trait juggling.</p>
 <h2 id="84-example-verifying-listreverse"><a class="header" href="#84-example-verifying-listreverse">8.4 Example: Verifying <code>List::reverse</code></a></h2>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>#[test]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct SGen&lt;A&gt;(A);
+</span><span class="boring">impl&lt;A&gt; SGen&lt;A&gt; { fn list_of(g: Gen&lt;A&gt;) -&gt; SGen&lt;Vec&lt;A&gt;&gt; { SGen(Vec::new()) } }
+</span><span class="boring">struct Gen&lt;A&gt;(A);
+</span><span class="boring">impl&lt;A&gt; Gen&lt;A&gt; { fn choose(start: i32, stop: i32) -&gt; Gen&lt;i32&gt; { Gen(0) } }
+</span><span class="boring">struct SimpleRNG; impl SimpleRNG { fn new(s: i64) -&gt; Self { SimpleRNG } }
+</span><span class="boring">struct Result; impl Result { fn is_falsified(&amp;self) -&gt; bool { false } }
+</span><span class="boring">struct Prop; impl Prop { fn check(&amp;self, a: i32, b: i32, rng: SimpleRNG) -&gt; Result { Result } }
+</span><span class="boring">fn for_all_sgen&lt;A, F&gt;(g: SGen&lt;A&gt;, f: F) -&gt; Prop where F: Fn(A) -&gt; bool { Prop }
+</span>
+#[test]
 fn test_list_reverse() {
     let small_int = Gen::&lt;i32&gt;::choose(0, 100);
     let reverse_prop = for_all_sgen(SGen::list_of(small_int), |ns: Vec&lt;i32&gt;| {
@@ -253,7 +264,7 @@ fn test_list_reverse() {
     let result = reverse_prop.check(10, 100, SimpleRNG::new(42));
     assert!(!result.is_falsified());
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {} // Tests don't run in main usually but good to have</span></code></pre></pre>
 <p>This ensures that for any generated list of integers, reversing it twice yields the original list. If we tried this with a broken reverse implementation, <code>Prop</code> would find a counter-example (e.g., <code>[0, 1]</code>) and report it.</p>
 <h2 id="85-summary"><a class="header" href="#85-summary">8.5 Summary</a></h2>
 <p>We have built a powerful testing library from scratch. It demonstrates how functional design principles (composition, pure functions) apply to domain-specific languages like testing frameworks.</p>

@@ -183,46 +183,40 @@
 <li>An identity element <code>zero: A</code> such that <code>op(x, zero) == x</code> and <code>op(zero, x) == x</code>.</li>
 </ol>
 <p>In Rust, we can define this as a trait. Since a single type can have multiple monoid instances (e.g., integers can be a monoid under addition or multiplication), we define the trait on a struct representing the monoid logic, rather than on the data type itself (using the "type class instance" pattern).</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub trait Monoid&lt;A&gt; {
+<pre><pre class="playground"><code class="language-rust">pub trait Monoid&lt;A&gt; {
     fn op(&amp;self, a1: A, a2: A) -&gt; A;
     fn zero(&amp;self) -&gt; A;
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
 <p><strong>String Monoid</strong>: Concatenation is associative, and the empty string is the identity.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Monoid&lt;A&gt; { fn op(&amp;self, a1: A, a2: A) -&gt; A; fn zero(&amp;self) -&gt; A; }
 </span>pub struct StringMonoid;
 impl Monoid&lt;String&gt; for StringMonoid {
     fn op(&amp;self, a1: String, a2: String) -&gt; String { a1 + &amp;a2 }
     fn zero(&amp;self) -&gt; String { "".to_string() }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p><strong>Int Addition</strong>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Monoid&lt;A&gt; { fn op(&amp;self, a1: A, a2: A) -&gt; A; fn zero(&amp;self) -&gt; A; }
 </span>pub struct IntAddition;
 impl Monoid&lt;i32&gt; for IntAddition {
     fn op(&amp;self, a1: i32, a2: i32) -&gt; i32 { a1 + a2 }
     fn zero(&amp;self) -&gt; i32 { 0 }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="102-folding-with-monoids"><a class="header" href="#102-folding-with-monoids">10.2 Folding with Monoids</a></h2>
 <p>Monoids are intimately related to folding lists. If we have a list of values <code>[a, b, c]</code> and a monoid for that type, we can reduce the list to a single value by combining them: <code>op(a, op(b, c))</code>.</p>
 <p>We can generalize this to <code>fold_map</code>. If we have a list of type <code>A</code>, and a function <code>f: A -&gt; B</code> where <code>B</code> has a monoid instance, we can map every element to <code>B</code> and then combine them.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Monoid&lt;A&gt; { fn op(&amp;self, a1: A, a2: A) -&gt; A; fn zero(&amp;self) -&gt; A; }
 </span>pub fn fold_map&lt;A, B, M, F&gt;(as_: Vec&lt;A&gt;, m: M, f: F) -&gt; B 
 where M: Monoid&lt;B&gt;, F: Fn(A) -&gt; B {
     as_.into_iter().fold(m.zero(), |acc, x| m.op(acc, f(x)))
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="103-associativity-and-parallelism"><a class="header" href="#103-associativity-and-parallelism">10.3 Associativity and Parallelism</a></h2>
 <p>The associativity law (<code>op(op(a, b), c) == op(a, op(b, c))</code>) means we don't have to fold sequentially from left to right. We can use a <strong>balanced fold</strong>, splitting the list in half, reducing each half recursively, and then combining the results. This enables parallelism.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Monoid&lt;A&gt; { fn op(&amp;self, a1: A, a2: A) -&gt; A; fn zero(&amp;self) -&gt; A; }
 </span>pub fn fold_map_v&lt;A, B, M, F&gt;(v: &amp;[A], m: &amp;M, f: &amp;F) -&gt; B
 where M: Monoid&lt;B&gt;, F: Fn(&amp;A) -&gt; B + Clone, B: Clone {
     if v.is_empty() {
@@ -236,30 +230,31 @@ where M: Monoid&lt;B&gt;, F: Fn(&amp;A) -&gt; B + Clone, B: Clone {
         m.op(lb, rb)
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="104-example-word-count"><a class="header" href="#104-example-word-count">10.4 Example: Word Count</a></h2>
 <p>A practical use case for parallel folding is counting words in a large string. If we split a string in the middle, we might split a word. To handle this, we define a specialized monoid <code>WC</code> (Word Count).</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum WC {
+<pre><pre class="playground"><code class="language-rust">pub enum WC {
     Stub(String), // Partial word
     Part(String, i32, String), // (Left partial, count of full words, Right partial)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>The monoid operation combines these parts, merging adjacent stubs to form complete words if necessary.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Monoid&lt;A&gt; { fn op(&amp;self, a1: A, a2: A) -&gt; A; fn zero(&amp;self) -&gt; A; }
+</span><span class="boring">pub enum WC { Stub(String), Part(String, i32, String) }
+</span><span class="boring">struct WCMonoid;
 </span>impl Monoid&lt;WC&gt; for WCMonoid {
     fn op(&amp;self, a1: WC, a2: WC) -&gt; WC {
         match (a1, a2) {
             (WC::Stub(c), WC::Stub(d)) =&gt; WC::Stub(c + &amp;d),
             (WC::Stub(c), WC::Part(l, w, r)) =&gt; WC::Part(c + &amp;l, w, r),
             // ... logic to merge parts ...
+            _ =&gt; WC::Stub(String::new()), // Simplified for example
         }
     }
     // ...
-}
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">  fn zero(&amp;self) -&gt; WC { WC::Stub("".to_string()) }
+</span>}
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>By mapping every character to a <code>WC</code> (whitespace becomes <code>Part("", 0, "")</code>, non-whitespace becomes <code>Stub(c)</code>), we can use <code>fold_map_v</code> to count words in parallel.</p>
 <h2 id="105-conclusion"><a class="header" href="#105-conclusion">10.5 Conclusion</a></h2>
 <p>Monoids provide a simple but powerful abstraction for combining values. Their laws ensure that operations like parallel folding are safe and correct. This sets the stage for more complex algebraic structures like Functors and Monads, which we will explore in the next chapters.</p>

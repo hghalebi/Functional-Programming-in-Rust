@@ -182,21 +182,18 @@
 <p>[!NOTE]
 Learn more about GATs in the <a href="https://blog.rust-lang.org/2022/10/28/gats-stabilization.html">Official Rust Blog Post</a>.</p>
 </blockquote>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub trait Functor {
+<pre><pre class="playground"><code class="language-rust">pub trait Functor {
     type Wrapped&lt;A&gt;;
     
     fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; 
     where F: Fn(A) -&gt; B;
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>This allows us to write generic code that works for any Functor, provided we implement the trait for a specific "Monad Type" (like <code>OptionMonad</code> acts as the descriptor for <code>Option</code>).</p>
 <h2 id="112-monads"><a class="header" href="#112-monads">11.2 Monads</a></h2>
 <p>The Monad abstraction adds <code>unit</code> and <code>flatMap</code> (often called <code>bind</code> or <code>&gt;&gt;=</code> in other languages).</p>
 <p>Make note that <strong>Rust's standard library</strong> uses the term <code>and_then</code> for <code>Option</code> and <code>Result</code>, and <code>flat_map</code> for <code>Iterator</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Functor { type Wrapped&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
 </span>pub trait Monad: Functor {
     fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;;
     
@@ -205,7 +202,7 @@ Learn more about GATs in the <a href="https://blog.rust-lang.org/2022/10/28/gats
     
     // ... map2 ...
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="the-map2-challenge-in-rust"><a class="header" href="#the-map2-challenge-in-rust">The <code>map2</code> Challenge in Rust</a></h3>
 <p>In functional theory, <code>map2</code> can be derived from <code>flatMap</code> and <code>map</code>. However, in Rust, implementing <code>map2</code> generically via <code>flatMap</code> involves closures.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]

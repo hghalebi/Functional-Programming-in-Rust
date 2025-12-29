@@ -178,17 +178,14 @@
 <p>In this chapter, we re-create two standard library types: <code>Option</code> and <code>Either</code>.</p>
 <h2 id="41-the-option-data-type"><a class="header" href="#41-the-option-data-type">4.1 The Option data type</a></h2>
 <p>We represent the possibility of an undefined result with <code>Option</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum Option&lt;A&gt; {
+<pre><pre class="playground"><code class="language-rust">pub enum Option&lt;A&gt; {
     Some(A),
     None,
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercises-41-basic-functions"><a class="header" href="#exercises-41-basic-functions">Exercises 4.1: Basic Functions</a></h3>
 <p>Implement <code>map</code>, <code>flat_map</code>, <code>get_or_else</code>, <code>or_else</code>, and <code>filter</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] pub enum Option&lt;A&gt; { Some(A), None }
 </span>impl&lt;A&gt; Option&lt;A&gt; {
     pub fn map&lt;B, F&gt;(self, f: F) -&gt; Option&lt;B&gt; 
     where F: FnOnce(A) -&gt; B {
@@ -229,12 +226,14 @@
         }
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-42-variance"><a class="header" href="#exercise-42-variance">Exercise 4.2: Variance</a></h3>
 <p>Implement <code>variance</code> in terms of <code>flat_map</code>.
 Variance is the mean of <code>math.pow(x - m, 2)</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] pub enum Option&lt;A&gt; { Some(A), None }
+</span><span class="boring">impl&lt;A&gt; Option&lt;A&gt; { 
+</span><span class="boring">   pub fn flat_map&lt;B, F&gt;(self, f: F) -&gt; Option&lt;B&gt; where F: FnOnce(A) -&gt; Option&lt;B&gt; { match self { Option::Some(a) =&gt; f(a), Option::None =&gt; Option::None } } 
+</span><span class="boring">}
 </span>fn mean(xs: &amp;[f64]) -&gt; Option&lt;f64&gt; {
     if xs.is_empty() {
         Option::None
@@ -246,20 +245,22 @@ Variance is the mean of <code>math.pow(x - m, 2)</code>.</p>
 pub fn variance(xs: &amp;[f64]) -&gt; Option&lt;f64&gt; {
     mean(xs).flat_map(|m| mean(&amp;xs.iter().map(|x| (x - m).powi(2)).collect::&lt;Vec&lt;_&gt;&gt;()))
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-43-map2"><a class="header" href="#exercise-43-map2">Exercise 4.3: Map2</a></h3>
 <p>Combine two Option values.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] pub enum Option&lt;A&gt; { Some(A), None }
+</span><span class="boring">impl&lt;A&gt; Option&lt;A&gt; { 
+</span><span class="boring">   pub fn flat_map&lt;B, F&gt;(self, f: F) -&gt; Option&lt;B&gt; where F: FnOnce(A) -&gt; Option&lt;B&gt; { match self { Option::Some(a) =&gt; f(a), Option::None =&gt; Option::None } } 
+</span><span class="boring">   pub fn map&lt;B, F&gt;(self, f: F) -&gt; Option&lt;B&gt; where F: FnOnce(A) -&gt; B { match self { Option::Some(a) =&gt; Option::Some(f(a)), Option::None =&gt; Option::None } }
+</span><span class="boring">}
 </span>pub fn map2&lt;A, B, C, F&gt;(a: Option&lt;A&gt;, b: Option&lt;B&gt;, f: F) -&gt; Option&lt;C&gt;
 where F: FnOnce(A, B) -&gt; C {
     a.flat_map(|aa| b.map(|bb| f(aa, bb)))
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-44-sequence"><a class="header" href="#exercise-44-sequence">Exercise 4.4: Sequence</a></h3>
 <p>Combine a list of Options into one Option containing a list.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub enum Option&lt;A&gt; { Some(A), None }
 </span>pub fn sequence&lt;A&gt;(a: Vec&lt;Option&lt;A&gt;&gt;) -&gt; Option&lt;Vec&lt;A&gt;&gt; {
     let mut res = Vec::new();
     for opt in a {
@@ -270,10 +271,9 @@ where F: FnOnce(A, B) -&gt; C {
     }
     Option::Some(res)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-45-traverse"><a class="header" href="#exercise-45-traverse">Exercise 4.5: Traverse</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub enum Option&lt;A&gt; { Some(A), None }
 </span>pub fn traverse&lt;A, B, F&gt;(a: Vec&lt;A&gt;, f: F) -&gt; Option&lt;Vec&lt;B&gt;&gt;
 where F: Fn(A) -&gt; Option&lt;B&gt; {
     let mut res = Vec::new();
@@ -285,19 +285,16 @@ where F: Fn(A) -&gt; Option&lt;B&gt; {
     }
     Option::Some(res)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="44-the-either-data-type"><a class="header" href="#44-the-either-data-type">4.4 The Either data type</a></h2>
 <p><code>Option</code> doesn't tell us <em>why</em> something failed. <code>Either</code> lets us track a reason.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum Either&lt;E, A&gt; {
+<pre><pre class="playground"><code class="language-rust">pub enum Either&lt;E, A&gt; {
     Left(E),
     Right(A),
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-46-basic-functions-on-either"><a class="header" href="#exercise-46-basic-functions-on-either">Exercise 4.6: Basic Functions on Either</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub enum Either&lt;E, A&gt; { Left(E), Right(A) }
 </span>impl&lt;E, A&gt; Either&lt;E, A&gt; {
     pub fn map&lt;B, F&gt;(self, f: F) -&gt; Either&lt;E, B&gt;
     where F: FnOnce(A) -&gt; B {
@@ -337,11 +334,10 @@ where F: Fn(A) -&gt; Option&lt;B&gt; {
         self.flat_map(|aa| b.map(|bb| f(aa, bb)))
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p><em>Note: In Rust, handling different error types <code>E</code> and <code>EE</code> usually requires <code>From</code> or a common Error trait.</em></p>
 <h3 id="exercise-47-sequence-and-traverse-for-either"><a class="header" href="#exercise-47-sequence-and-traverse-for-either">Exercise 4.7: Sequence and Traverse for Either</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub enum Either&lt;E, A&gt; { Left(E), Right(A) }
 </span>pub fn sequence_either&lt;E, A&gt;(es: Vec&lt;Either&lt;E, A&gt;&gt;) -&gt; Either&lt;E, Vec&lt;A&gt;&gt; {
     traverse_either(es, |x| x)
 }
@@ -357,7 +353,7 @@ where F: Fn(A) -&gt; Either&lt;E, B&gt; {
     }
     Either::Right(res)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-48-accumulating-errors"><a class="header" href="#exercise-48-accumulating-errors">Exercise 4.8: Accumulating Errors</a></h3>
 <p>To report <em>both</em> errors in <code>mkPerson</code> (name and age invalid), we would need a data structure that can hold multiple errors, like <code>Validation&lt;Vec&lt;E&gt;, A&gt;</code>. <code>Either</code> stops at the first error (fail-fast).</p>
 <h2 id="45-summary"><a class="header" href="#45-summary">4.5 Summary</a></h2>

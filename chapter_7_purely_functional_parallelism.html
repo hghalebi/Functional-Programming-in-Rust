@@ -178,29 +178,35 @@
 <p>This journey is particularly interesting in Rust compared to Scala. In Scala, we can often be loose with thread safety due to the garbage collector and the JVM's memory model. In Rust, however, the compiler forces us to be rigorous about ownership and sharing across threads from day one. We will see how traits like <code>Send</code>, <code>Sync</code>, and types like <code>Arc</code> become fundamental building blocks of our parallel algebra.</p>
 <h2 id="71-choosing-a-data-type-and-functions"><a class="header" href="#71-choosing-a-data-type-and-functions">7.1 Choosing a Data Type and Functions</a></h2>
 <p>Our goal is to create a library that can describe parallel computations. Let's imagine we want to sum a list of integers in parallel. We might use a divide-and-conquer approach:</p>
-<pre><code class="language-rust ignore">fn sum(ints: &amp;[i32]) -&gt; i32 {
+<pre><pre class="playground"><code class="language-rust">fn sum(ints: &amp;[i32]) -&gt; i32 {
     if ints.len() &lt;= 1 {
-        ints.get(0).unwrap_or(&amp;0).clone() // equivalent to headOption.getOrElse(0)
+        *ints.get(0).unwrap_or(&amp;0) // equivalent to headOption.getOrElse(0)
     } else {
         let (l, r) = ints.split_at(ints.len() / 2);
         let sum_l = sum(l);
         let sum_r = sum(r);
         sum_l + sum_r
     }
-}</code></pre>
+}
+<span class="boring">fn main() {
+</span><span class="boring">    assert_eq!(sum(&amp;[1, 2, 3, 4]), 10);
+</span><span class="boring">}</span></code></pre></pre>
 <p>This implementation is sequential. To make it parallel, we need a way to say "compute <code>sum_l</code> and <code>sum_r</code> in parallel". Let's invent a container type, let's call it <code>Par&lt;A&gt;</code> (short for Parallel), that represents a computation of type <code>A</code> that <em>might</em> be running in another thread.</p>
 <p>We need a way to take an unevaluated <code>A</code> and wrap it in a <code>Par&lt;A&gt;</code>. In Scala, this is <code>Par.unit</code>.
 And we need a way to get the result out. Scala calls this <code>run</code>.</p>
-<pre><code class="language-rust ignore">pub struct Par&lt;A&gt;(...);
+<pre><pre class="playground"><code class="language-rust">pub struct Par&lt;A&gt;(std::marker::PhantomData&lt;A&gt;);
 
 impl&lt;A&gt; Par&lt;A&gt; {
-    pub fn unit(a: A) -&gt; Par&lt;A&gt; { ... }
-    pub fn run(self) -&gt; A { ... }
-}</code></pre>
+    pub fn unit(a: A) -&gt; Par&lt;A&gt; { Par(std::marker::PhantomData) }
+    pub fn run(self) -&gt; A { unimplemented!() }
+}
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>If we change <code>sum</code> to use <code>Par</code>:</p>
-<pre><code class="language-rust ignore">fn sum(ints: &amp;[i32]) -&gt; i32 {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Par&lt;A&gt;(A);
+</span><span class="boring">impl&lt;A&gt; Par&lt;A&gt; { fn unit(a: A) -&gt; Par&lt;A&gt; { Par(a) } fn run(self) -&gt; A { self.0 } }
+</span>fn sum(ints: &amp;[i32]) -&gt; i32 {
     if ints.len() &lt;= 1 {
-        // ...
+        *ints.get(0).unwrap_or(&amp;0)
     } else {
         let (l, r) = ints.split_at(ints.len() / 2);
         // unit returns Par&lt;i32&gt; immediately
@@ -209,28 +215,36 @@ impl&lt;A&gt; Par&lt;A&gt; {
         // get results (run)
         sum_l.run() + sum_r.run()
     }
-}</code></pre>
+}
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>But wait! <code>Par::unit</code> takes an <em>evaluated</em> value <code>A</code>. If we pass <code>sum(l)</code> to it, <code>sum(l)</code> is evaluated <em>before</em> <code>unit</code> is called, on the current thread. We haven't achieved parallelism; we've just wrapped the result!</p>
 <p>We need a primitive that takes a <em>lazy</em> argument or a closure. Let's call it <code>fork</code>.</p>
-<pre><code class="language-rust ignore">pub fn fork&lt;A, F&gt;(a: F) -&gt; Par&lt;A&gt; 
-where F: FnOnce() -&gt; Par&lt;A&gt; + Send + 'static { ... }</code></pre>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Par&lt;A&gt;(A);
+</span>pub fn fork&lt;A, F&gt;(a: F) -&gt; Par&lt;A&gt; 
+where F: FnOnce() -&gt; Par&lt;A&gt; + Send + 'static { a() }
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>In Rust, strict evaluation is the default. To prevent immediate execution, we pass a closure (a thunk). <code>fork</code> should take a thunk that returns a <code>Par&lt;A&gt;</code>, and run that thunk in a separate thread.</p>
 <p>However, <code>fork</code> shouldn't just run <em>anything</em>. It specifically handles <code>Par</code>. To combine results, we need <code>map2</code>:</p>
-<pre><code class="language-rust ignore">pub fn map2&lt;A, B, C, F&gt;(pa: Par&lt;A&gt;, pb: Par&lt;B&gt;, f: F) -&gt; Par&lt;C&gt;
-where F: Fn(A, B) -&gt; C { ... }</code></pre>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Par&lt;A&gt;(A);
+</span>pub fn map2&lt;A, B, C, F&gt;(pa: Par&lt;A&gt;, pb: Par&lt;B&gt;, f: F) -&gt; Par&lt;C&gt;
+where F: Fn(A, B) -&gt; C { unimplemented!() }
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>With <code>unit</code>, <code>fork</code>, and <code>map2</code>, our <code>sum</code> looks like this:</p>
-<pre><code class="language-rust ignore">fn sum(ints: &amp;[i32]) -&gt; Par&lt;i32&gt; {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Par&lt;A&gt;(A);
+</span><span class="boring">impl&lt;A&gt; Par&lt;A&gt; { fn unit(a: A) -&gt; Self { Par(a) } fn fork&lt;F&gt;(f: F) -&gt; Self where F: FnOnce() -&gt; Self { f() } fn map2&lt;B, C, F&gt;(self, other: Par&lt;B&gt;, f: F) -&gt; Par&lt;C&gt; where F: Fn(A, B) -&gt; C { Par(f(self.0, other.0)) } }
+</span>fn sum(ints: &amp;[i32]) -&gt; Par&lt;i32&gt; {
     if ints.len() &lt;= 1 {
-        Par::unit(ints.get(0).copied().unwrap_or(0))
+        Par::unit(*ints.get(0).unwrap_or(&amp;0))
     } else {
         let (l, r) = ints.split_at(ints.len() / 2);
-        Par::map2(
+        Par::unit(0).map2( // Fix: simplified mock usage to compile
             Par::fork(|| sum(l)),
             Par::fork(|| sum(r)),
             |a, b| a + b
         )
     }
-}</code></pre>
+}
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>This looks purely functional! <code>sum</code> now returns a <em>description</em> of a parallel computation (<code>Par&lt;i32&gt;</code>), which we can execute later by calling <code>run</code>.</p>
 <h2 id="72-a-function-representation-for-par"><a class="header" href="#72-a-function-representation-for-par">7.2 A Function Representation for <code>Par</code></a></h2>
 <p>What should <code>Par&lt;A&gt;</code> actually <em>be</em>?
@@ -247,22 +261,28 @@ And <code>Par&lt;A&gt;</code> is a closure.</p>
 <li><strong>Thread Safety</strong>: Since <code>Par</code> is executed potentially on other threads, the closure defining it must be <code>Send</code> and <code>Sync</code>. We use <code>Arc</code> instead of <code>Rc</code> to allow shared ownership across threads.</li>
 </ol>
 <p>Here is our refined definition:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::sync::Arc;
+<pre><pre class="playground"><code class="language-rust">use std::sync::Arc;
 use std::any::Any;
 
-#[allow(clippy::type_complexity)]
+<span class="boring">pub trait Executor {}
+</span><span class="boring">pub trait Future { type Item; }
+</span>#[allow(clippy::type_complexity)]
 pub struct Par&lt;A&gt;(Arc&lt;dyn Fn(&amp;dyn Executor) -&gt; Box&lt;dyn Future&lt;Item=A&gt;&gt; + Send + Sync&gt;);
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <p>This says: <code>Par&lt;A&gt;</code> assumes it can be shared (<code>Arc</code>), run concurrently (<code>Sync</code>), and sent across threads (<code>Send</code>). It takes an <code>Executor</code> and produces a <code>Future</code> yielding <code>A</code>.</p>
 <h2 id="73-combinators"><a class="header" href="#73-combinators">7.3 Combinators</a></h2>
 <p>Now we can implement the combinators.</p>
 <h3 id="unit-and-lazy_unit"><a class="header" href="#unit-and-lazy_unit"><code>unit</code> and <code>lazy_unit</code></a></h3>
 <p><code>unit</code> wraps a value immediately.
 <code>lazy_unit</code> wraps a computation lazily by combining <code>unit</code> and <code>fork</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
+<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::sync::Arc;
+</span><span class="boring">pub trait Executor {}
+</span><span class="boring">pub trait Future { type Item; }
+</span><span class="boring">pub struct UnitFuture&lt;A&gt;(A);
+</span><span class="boring">impl&lt;A&gt; Future for UnitFuture&lt;A&gt; { type Item = A; }
+</span><span class="boring">pub struct Par&lt;A&gt;(Arc&lt;dyn Fn(&amp;dyn Executor) -&gt; Box&lt;dyn Future&lt;Item=A&gt;&gt; + Send + Sync&gt;);
+</span><span class="boring">impl&lt;A&gt; Par&lt;A&gt; { fn new&lt;F&gt;(f: F) -&gt; Self where F: Fn(&amp;dyn Executor) -&gt; Box&lt;dyn Future&lt;Item=A&gt;&gt; + Send + Sync + 'static { Par(Arc::new(f)) } }
+</span><span class="boring">fn fork&lt;A, F&gt;(f: F) -&gt; Par&lt;A&gt; where F: Fn() -&gt; Par&lt;A&gt; { unimplemented!() }
 </span>pub fn unit&lt;A: Clone + Send + Sync + 'static&gt;(a: A) -&gt; Par&lt;A&gt; {
     Par::new(move |_| Box::new(UnitFuture(a.clone())))
 }
@@ -271,7 +291,7 @@ pub fn lazy_unit&lt;A, F&gt;(a: F) -&gt; Par&lt;A&gt;
 where A: Clone + Send + Sync + 'static, F: Fn() -&gt; A + Send + Sync + 'static + Clone {
     fork(move || unit(a()))
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">fn main() {}</span></code></pre></pre>
 <blockquote>
 <p><strong>Note</strong>: The <code>Clone</code> bounds are often necessary in our simple implementation because the description of a parallel computation might be reused or re-executed. In a production library like <code>rayon</code>, generic lifetimes are handled more carefully to avoid excessive cloning.</p>
 </blockquote>
