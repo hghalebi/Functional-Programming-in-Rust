@@ -18,6 +18,7 @@ pub trait Functor {
     fn map<A, B, F>(fa: Self::Wrapped<A>, f: F) -> Self::Wrapped<B> 
     where F: Fn(A) -> B;
 }
+# fn main() {}
 ```
 
 This allows us to write generic code that works for any Functor, provided we implement the trait for a specific "Monad Type" (like `OptionMonad` acts as the descriptor for `Option`).
@@ -29,6 +30,7 @@ The Monad abstraction adds `unit` and `flatMap` (often called `bind` or `>>=` in
 Make note that **Rust's standard library** uses the term `and_then` for `Option` and `Result`, and `flat_map` for `Iterator`.
 
 ```rust
+# pub trait Functor { type Wrapped<A>; fn map<A, B, F>(fa: Self::Wrapped<A>, f: F) -> Self::Wrapped<B> where F: Fn(A) -> B; }
 pub trait Monad: Functor {
     fn unit<A>(a: A) -> Self::Wrapped<A>;
     
@@ -37,6 +39,7 @@ pub trait Monad: Functor {
     
     // ... map2 ...
 }
+# fn main() {}
 ```
 
 ### The `map2` Challenge in Rust

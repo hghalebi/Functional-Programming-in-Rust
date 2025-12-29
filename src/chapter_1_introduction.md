@@ -24,7 +24,11 @@ Let’s look at an example that demonstrates some of the benefits of programming
 
 Suppose we’re implementing a program to handle purchases at a coffee shop. We’ll begin with a Rust program that uses side effects in its implementation (also called an impure program).
 
-```rust,ignore
+```rust
+# struct Coffee { price: f64 }
+# impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
+# struct CreditCard;
+# impl CreditCard { fn charge(&mut self, _price: f64) {} }
 struct Cafe;
 
 impl Cafe {
@@ -34,6 +38,11 @@ impl Cafe {
         cup
     }
 }
+# fn main() {
+#     let cafe = Cafe;
+#     let mut cc = CreditCard;
+#     let _ = cafe.buy_coffee(&mut cc);
+# }
 ```
 
 The line `cc.charge(cup.price)` is an example of a side effect. Charging a credit card involves some interaction with the outside world—suppose it requires contacting the credit card company via some web service, authorizing the transaction, charging the card, and (if successful) persisting some record of the transaction for later reference. 
@@ -42,16 +51,28 @@ But our function merely returns a `Coffee` and these other actions are happening
 
 As a result of this side effect, the code is difficult to test. We don’t want our tests to actually contact the credit card company and charge the card! This lack of testability is suggesting a design change: arguably, `CreditCard` shouldn’t have any knowledge baked into it about how to contact the credit card company to actually execute a charge, nor should it have knowledge of how to persist a record of this charge in our internal systems. We can make the code more modular and testable by letting `CreditCard` be ignorant of these concerns and passing a `Payments` object into `buy_coffee`.
 
-```rust,ignore
+```rust
+# struct Coffee { price: f64 }
+# impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
+# struct CreditCard;
+# trait Payments { fn charge(&mut self, cc: &mut CreditCard, amount: f64); }
+# struct MockPayments;
+# impl Payments for MockPayments { fn charge(&mut self, _cc: &mut CreditCard, _amount: f64) {} }
 struct Cafe;
 
 impl Cafe {
-    fn buy_coffee(&self, cc: &mut CreditCard, p: &mut Payments) -> Coffee {
+    fn buy_coffee(&self, cc: &mut CreditCard, p: &mut dyn Payments) -> Coffee {
         let cup = Coffee::new();
         p.charge(cc, cup.price);
         cup
     }
 }
+# fn main() {
+#     let cafe = Cafe;
+#     let mut cc = CreditCard;
+#     let mut p = MockPayments;
+#     let _ = cafe.buy_coffee(&mut cc, &mut p);
+# }
 ```
 
 Though side effects still occur when we call `p.charge(cc, cup.price)`, we have at least regained some testability. `Payments` can be a trait (interface), and we can write a mock implementation of this trait that is suitable for testing. But that isn’t ideal either. We’re forced to make `Payments` a trait, when a concrete struct may have been fine otherwise, and any mock implementation will be awkward to use. For example, it might contain some internal state that we’ll have to inspect after the call to `buy_coffee`, and our test will have to make sure this state has been appropriately modified (mutated) by the call to `charge`.
@@ -64,7 +85,12 @@ The functional solution is to eliminate side effects and have `buy_coffee` retur
 
 Here’s what a functional solution might look like in Rust:
 
-```rust,ignore
+```rust
+# #[derive(Clone)] struct CreditCard;
+# struct Coffee { price: f64 }
+# impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
+# struct Charge { cc: CreditCard, amount: f64 }
+# impl Charge { fn new(cc: CreditCard, amount: f64) -> Self { Charge { cc, amount } } }
 struct Cafe;
 
 impl Cafe {
@@ -73,11 +99,17 @@ impl Cafe {
         (cup, Charge::new(cc.clone(), cup.price))
     }
 }
+# fn main() {
+#     let cafe = Cafe;
+#     let cc = CreditCard;
+#     let _ = cafe.buy_coffee(&cc);
+# }
 ```
 
 Here we’ve separated the concern of creating a charge from the processing or interpretation of that charge. The `buy_coffee` function now returns a `Charge` as a value along with the `Coffee`. We’ll see shortly how this lets us reuse it more easily to purchase multiple coffees with a single transaction. But what is `Charge`? It’s a data type we just invented containing a `CreditCard` and an amount, equipped with a handy function, `combine`, for combining charges with the same `CreditCard`:
 
 ```rust
+# #[derive(PartialEq, Clone)] struct CreditCard;
 struct Charge {
     cc: CreditCard,
     amount: f64,
@@ -95,12 +127,28 @@ impl Charge {
         }
     }
 }
+# fn main() {
+#    let cc = CreditCard;
+#    let c1 = Charge { cc: cc.clone(), amount: 2.0 };
+#    let c2 = Charge { cc, amount: 3.0 };
+#    assert!(c1.combine(&c2).is_ok());
+# }
 ```
 
 Now let’s look at `buy_coffees`, to implement the purchase of `n` cups of coffee. Unlike before, this can now be implemented in terms of `buy_coffee`, as we had hoped.
 
-```rust,ignore
+```rust
+# #[derive(PartialEq, Clone)] struct CreditCard;
+# struct Coffee { price: f64 }
+# impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
+# #[derive(Clone)] struct Charge { cc: CreditCard, amount: f64 }
+# impl Charge { 
+#    fn new(cc: CreditCard, amount: f64) -> Self { Charge { cc, amount } } 
+#    fn combine(&self, other: &Charge) -> Result<Charge, String> { Ok(Charge { cc: self.cc.clone(), amount: self.amount + other.amount }) }
+# }
+# struct Cafe;
 impl Cafe {
+#   fn buy_coffee(&self, cc: &CreditCard) -> (Coffee, Charge) { (Coffee::new(), Charge::new(cc.clone(), 2.5)) }
     fn buy_coffees(&self, cc: &CreditCard, n: usize) -> (Vec<Coffee>, Charge) {
         let purchases: Vec<(Coffee, Charge)> = (0..n)
             .map(|_| self.buy_coffee(cc))
@@ -115,13 +163,24 @@ impl Cafe {
         (coffees, combined_charge)
     }
 }
+# fn main() {
+#     let cafe = Cafe;
+#     let cc = CreditCard;
+#     let (_, charge) = cafe.buy_coffees(&cc, 12);
+#     assert_eq!(charge.amount, 30.0);
+# }
 ```
 
 Overall, this solution is a marked improvement—we’re now able to reuse `buy_coffee` directly to define the `buy_coffees` function, and both functions are trivially testable without having to define complicated mock implementations of some `Payments` interface!
 
 Making `Charge` into a first-class value has other benefits we might not have anticipated: we can more easily assemble business logic for working with these charges. For instance, Alice may bring her laptop to the coffee shop and work there for a few hours, making occasional purchases. It might be nice if the coffee shop could combine these purchases Alice makes into a single charge, again saving on credit card processing fees. Since `Charge` is first-class, we can write the following function to coalesce any same-card charges in a `Vec<Charge>`:
 
-```rust,ignore
+```rust
+# use std::collections::HashMap;
+# #[derive(PartialEq, Eq, Clone, Hash)] struct CreditCard;
+# #[derive(Clone)] struct Charge { cc: CreditCard, amount: f64 }
+# impl Charge { fn combine(&self, other: &Charge) -> Result<Charge, String> { Ok(Charge { cc: self.cc.clone(), amount: self.amount + other.amount }) } }
+
 fn coalesce(charges: Vec<Charge>) -> Vec<Charge> {
     // In a real Rust app, we might use itertools using a HashMap or sort first
     // Since we don't have itertools in pure std, we can implement it simply.
@@ -136,6 +195,13 @@ fn coalesce(charges: Vec<Charge>) -> Vec<Charge> {
         .map(|list| list.iter().cloned().reduce(|c1, c2| c1.combine(&c2).unwrap()).unwrap())
         .collect()
 }
+# fn main() {
+#    let cc = CreditCard;
+#    let charges = vec![Charge { cc: cc.clone(), amount: 1.0 }, Charge { cc, amount: 2.0 }];
+#    let coalesced = coalesce(charges);
+#    assert_eq!(coalesced.len(), 1);
+#    assert_eq!(coalesced[0].amount, 3.0);
+# }
 ```
 
 This sort of transformation can be applied to any function with side effects to push these effects to the outer layers of the program. Functional programmers often speak of implementing programs with a pure core and a thin layer on the outside that handles effects.

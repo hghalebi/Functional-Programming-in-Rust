@@ -8,6 +8,7 @@ A Monad is defined by `unit` and `flatMap`.
 An Applicative is defined by `unit` and `map2` (or `apply`).
 
 ```rust
+# pub trait Functor { type Wrapped<A>; fn map<A, B, F>(fa: Self::Wrapped<A>, f: F) -> Self::Wrapped<B> where F: Fn(A) -> B; }
 pub trait Applicative: Functor {
     fn unit<A>(a: A) -> Self::Wrapped<A>; // Same as Monad
     
@@ -17,6 +18,7 @@ pub trait Applicative: Functor {
         f: F
     ) -> Self::Wrapped<C>;
 }
+# fn main() {}
 ```
 
 ### Why Applicative?
@@ -37,6 +39,8 @@ We've seen `traverse` and `sequence` for List, Option, and Map. We can abstract 
 A Traversable functor allows us to iterate over a data structure (like a Tree or List) while maintaining an effect (Applicative) context.
 
 ```rust
+# pub trait Functor { type Wrapped<A>; fn map<A, B, F>(fa: Self::Wrapped<A>, f: F) -> Self::Wrapped<B> where F: Fn(A) -> B; }
+# pub trait Applicative: Functor { fn unit<A>(a: A) -> Self::Wrapped<A>; fn map2<A, B, C, F>(fa: Self::Wrapped<A>, fb: Self::Wrapped<B>, f: F) -> Self::Wrapped<C>; }
 pub trait Traverse: Functor { // actually extends Functor and Foldable conceptually
     fn traverse<G, A, B, F>(
         fa: Self::Wrapped<A>,
@@ -44,6 +48,7 @@ pub trait Traverse: Functor { // actually extends Functor and Foldable conceptua
     ) -> G::Wrapped<Self::Wrapped<B>>
     where G: Applicative;
 }
+# fn main() {}
 ```
 
 ### Example: Tree Traversal
@@ -51,9 +56,15 @@ pub trait Traverse: Functor { // actually extends Functor and Foldable conceptua
 If we have a `Tree<i32>` and we want to apply a function that might fail (returning `Option<i32>`) to every node, `traverse` will give us `Option<Tree<i32>>`. It turns the "Tree of Options" into an "Option of Tree".
 
 ```rust
+# pub trait Functor { type Wrapped<A>; fn map<A, B, F>(fa: Self::Wrapped<A>, f: F) -> Self::Wrapped<B> where F: Fn(A) -> B; }
+# pub trait Applicative: Functor { fn unit<A>(a: A) -> Self::Wrapped<A>; fn map2<A, B, C, F>(fa: Self::Wrapped<A>, fb: Self::Wrapped<B>, f: F) -> Self::Wrapped<C>; fn map<A, B, F>(fa: Self::Wrapped<A>, f: F) -> Self::Wrapped<B> where F: Fn(A) -> B; }
+# pub trait Traverse: Functor { fn traverse<G, A, B, F>(fa: Self::Wrapped<A>, f: F) -> G::Wrapped<Self::Wrapped<B>> where G: Applicative; }
+# enum Tree<A> { Leaf(A), Branch(Box<Tree<A>>, Box<Tree<A>>) }
+# struct TreeApp;
+# impl Functor for TreeApp { type Wrapped<A> = Tree<A>; fn map<A, B, F>(fa: Tree<A>, f: F) -> Tree<B> where F: Fn(A) -> B { match fa { Tree::Leaf(a) => Tree::Leaf(f(a)), Tree::Branch(l, r) => Tree::Branch(Box::new(Self::map(*l, &f)), Box::new(Self::map(*r, f))) } } } // Dummy impl
 impl Traverse for TreeApp {
     fn traverse<G, A, B, F>(fa: Tree<A>, f: F) -> G::Wrapped<Tree<B>>
-    where G: Applicative, ... {
+    where G: Applicative, F: Fn(A) -> G::Wrapped<B> + Clone + 'static { // Added bounds for compilation
         match fa {
             Tree::Leaf(a) => G::map(f(a), |b| Tree::Leaf(b)),
             Tree::Branch(l, r) => {
@@ -64,6 +75,7 @@ impl Traverse for TreeApp {
         }
     }
 }
+# fn main() {}
 ```
 
 ## 12.3 Conclusion

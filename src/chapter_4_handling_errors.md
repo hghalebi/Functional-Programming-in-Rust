@@ -13,6 +13,7 @@ pub enum Option<A> {
     Some(A),
     None,
 }
+# fn main() {}
 ```
 
 ### Exercises 4.1: Basic Functions
@@ -20,6 +21,7 @@ pub enum Option<A> {
 Implement `map`, `flat_map`, `get_or_else`, `or_else`, and `filter`.
 
 ```rust
+# #[derive(Clone, Copy)] pub enum Option<A> { Some(A), None }
 impl<A> Option<A> {
     pub fn map<B, F>(self, f: F) -> Option<B> 
     where F: FnOnce(A) -> B {
@@ -60,6 +62,7 @@ impl<A> Option<A> {
         }
     }
 }
+# fn main() {}
 ```
 
 ### Exercise 4.2: Variance
@@ -67,6 +70,10 @@ Implement `variance` in terms of `flat_map`.
 Variance is the mean of `math.pow(x - m, 2)`.
 
 ```rust
+# #[derive(Clone, Copy)] pub enum Option<A> { Some(A), None }
+# impl<A> Option<A> { 
+#    pub fn flat_map<B, F>(self, f: F) -> Option<B> where F: FnOnce(A) -> Option<B> { match self { Option::Some(a) => f(a), Option::None => Option::None } } 
+# }
 fn mean(xs: &[f64]) -> Option<f64> {
     if xs.is_empty() {
         Option::None
@@ -78,22 +85,30 @@ fn mean(xs: &[f64]) -> Option<f64> {
 pub fn variance(xs: &[f64]) -> Option<f64> {
     mean(xs).flat_map(|m| mean(&xs.iter().map(|x| (x - m).powi(2)).collect::<Vec<_>>()))
 }
+# fn main() {}
 ```
 
 ### Exercise 4.3: Map2
 Combine two Option values.
 
 ```rust
+# #[derive(Clone, Copy)] pub enum Option<A> { Some(A), None }
+# impl<A> Option<A> { 
+#    pub fn flat_map<B, F>(self, f: F) -> Option<B> where F: FnOnce(A) -> Option<B> { match self { Option::Some(a) => f(a), Option::None => Option::None } } 
+#    pub fn map<B, F>(self, f: F) -> Option<B> where F: FnOnce(A) -> B { match self { Option::Some(a) => Option::Some(f(a)), Option::None => Option::None } }
+# }
 pub fn map2<A, B, C, F>(a: Option<A>, b: Option<B>, f: F) -> Option<C>
 where F: FnOnce(A, B) -> C {
     a.flat_map(|aa| b.map(|bb| f(aa, bb)))
 }
+# fn main() {}
 ```
 
 ### Exercise 4.4: Sequence
 Combine a list of Options into one Option containing a list.
 
 ```rust
+# pub enum Option<A> { Some(A), None }
 pub fn sequence<A>(a: Vec<Option<A>>) -> Option<Vec<A>> {
     let mut res = Vec::new();
     for opt in a {
@@ -104,10 +119,12 @@ pub fn sequence<A>(a: Vec<Option<A>>) -> Option<Vec<A>> {
     }
     Option::Some(res)
 }
+# fn main() {}
 ```
 
 ### Exercise 4.5: Traverse
 ```rust
+# pub enum Option<A> { Some(A), None }
 pub fn traverse<A, B, F>(a: Vec<A>, f: F) -> Option<Vec<B>>
 where F: Fn(A) -> Option<B> {
     let mut res = Vec::new();
@@ -119,6 +136,7 @@ where F: Fn(A) -> Option<B> {
     }
     Option::Some(res)
 }
+# fn main() {}
 ```
 
 ## 4.4 The Either data type
@@ -130,11 +148,13 @@ pub enum Either<E, A> {
     Left(E),
     Right(A),
 }
+# fn main() {}
 ```
 
 ### Exercise 4.6: Basic Functions on Either
 
 ```rust
+# pub enum Either<E, A> { Left(E), Right(A) }
 impl<E, A> Either<E, A> {
     pub fn map<B, F>(self, f: F) -> Either<E, B>
     where F: FnOnce(A) -> B {
@@ -174,12 +194,14 @@ impl<E, A> Either<E, A> {
         self.flat_map(|aa| b.map(|bb| f(aa, bb)))
     }
 }
+# fn main() {}
 ```
 *Note: In Rust, handling different error types `E` and `EE` usually requires `From` or a common Error trait.*
 
 ### Exercise 4.7: Sequence and Traverse for Either
 
 ```rust
+# pub enum Either<E, A> { Left(E), Right(A) }
 pub fn sequence_either<E, A>(es: Vec<Either<E, A>>) -> Either<E, Vec<A>> {
     traverse_either(es, |x| x)
 }
@@ -195,6 +217,7 @@ where F: Fn(A) -> Either<E, B> {
     }
     Either::Right(res)
 }
+# fn main() {}
 ```
 
 ### Exercise 4.8: Accumulating Errors

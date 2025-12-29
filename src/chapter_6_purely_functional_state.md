@@ -19,6 +19,19 @@ impl SimpleRNG {
         SimpleRNG { seed }
     }
 }
+# impl RNG for SimpleRNG {
+#     fn next_int(&self) -> (i32, Box<dyn RNG>) {
+#         let new_seed = (self.seed.wrapping_mul(0x5DEECE66D).wrapping_add(0xB)) & 0xFFFFFFFFFFFF;
+#         let next_rng = SimpleRNG { seed: new_seed };
+#         let n = (new_seed >> 16) as i32;
+#         (n, Box::new(next_rng))
+#     }
+# }
+# fn main() {
+#     let rng = SimpleRNG::new(42);
+#     let (n1, _rng2) = rng.next_int();
+#     println!("{}", n1);
+# }
 ```
 
 ### Exercise 6.1: non_negative_int
@@ -31,7 +44,9 @@ impl SimpleRNG {
 We define `Rand<A>` as a type alias for `Fn(RNG) -> (A, RNG)`.
 
 ```rust
+# pub trait RNG {}
 type Rand<A> = Box<dyn Fn(Box<dyn RNG>) -> (A, Box<dyn RNG>)>;
+# fn main() {}
 ```
 
 ### Exercise 6.5: double via map
@@ -46,6 +61,7 @@ We generalize `Rand` to `State<S, A>`.
 
 ```rust
 pub struct State<S, A>(pub Box<dyn Fn(S) -> (A, S)>);
+# fn main() {}
 ```
 
 ### Exercise 6.10: unit, map, map2, flat_map, sequence for State
@@ -68,6 +84,7 @@ pub struct Machine {
     pub candies: i32,
     pub coins: i32,
 }
+# fn main() {}
 ```
 
 3. Turn locked or Coin unlocked does nothing.

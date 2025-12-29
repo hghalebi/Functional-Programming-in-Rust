@@ -25,6 +25,10 @@ impl<A> SimpleIO<A> {
         SimpleIO::new(move || f(self.run()).run())
     }
 }
+# fn main() {
+#     let io = SimpleIO::new(|| 42);
+#     assert_eq!(io.run(), 42);
+# }
 ```
 
 ## 13.2 Composition
@@ -35,8 +39,17 @@ Since `IO` is a description, we can compose these descriptions. `IO` forms a Mon
 - **`flatMap`**: Chain effects, where the second effect depends on the result of the first.
 
 ```rust
+# struct SimpleIO<A>(Box<dyn FnOnce() -> A>);
+# impl<A> SimpleIO<A> { fn new<F>(f: F) -> Self where F: FnOnce() -> A + 'static { SimpleIO(Box::new(f)) } fn flat_map<B, F>(self, f: F) -> SimpleIO<B> where F: FnOnce(A) -> SimpleIO<B> + 'static { (self.0)(); f((self.0)()) } } // Mock
+struct Console;
+impl Console {
+    fn read_line() -> SimpleIO<String> { SimpleIO::new(|| "Bob".to_string()) }
+    fn print_line(_: &str) -> SimpleIO<()> { SimpleIO::new(|| ()) }
+}
+
 let program = Console::read_line()
-    .flatMap(|name| Console::print_line(&format!("Hello, {}!", name)));
+    .flat_map(|name| Console::print_line(&format!("Hello, {}!", name)));
+# fn main() {}
 ```
 
 Until we call `program.run()`, nothing happens. This is **Referential Transparency**: the expression `program` can be replaced by its definition without changing the outcome (because the outcome *is just a description*, not the side effect itself).

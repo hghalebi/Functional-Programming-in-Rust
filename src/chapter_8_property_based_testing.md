@@ -15,7 +15,10 @@ We need two core data types:
 A generator is essentially a state transition over a random number generator. In Chapter 6, we built `State<RNG, A>`. `Gen<A>` is simply a wrapper around this state.
 
 ```rust
+# struct State<S, A>(Box<dyn Fn(S) -> (A, S)>);
+# struct SimpleRNG;
 pub struct Gen<A>(State<SimpleRNG, A>);
+# fn main() {}
 ```
 
 This allows us to leverage all the combinators we wrote for `State`, like `map` and `flat_map`, to compose complex generators from simple ones.
@@ -36,6 +39,12 @@ A property is something we can check. A simple boolean `check` is insufficient b
 Our `Prop` type encapsulates a function that takes configuration (max size, number of test cases) and a source of randomness, returning a `Result`.
 
 ```rust
+# use std::rc::Rc;
+# struct MaxSize(i32);
+# struct TestCases(i32);
+# struct SimpleRNG;
+# struct FailedCase(String);
+# struct SuccessCount(i32);
 pub struct Prop(Rc<dyn Fn(MaxSize, TestCases, SimpleRNG) -> Result>);
 
 pub enum Result {
@@ -43,6 +52,7 @@ pub enum Result {
     Falsified(FailedCase, SuccessCount),
     Proved,
 }
+# fn main() {}
 ```
 
 We use `Rc<dyn Fn...>` to allow properties to be cloned and shared, which is essential when combining them (e.g., `prop1.and(prop2)`).
@@ -56,7 +66,10 @@ Debugging failures on massive inputs is hard. There are two main approaches to m
 We implement **Sized Generation** via `SGen`:
 
 ```rust
+# use std::rc::Rc;
+# struct Gen<A>(A); // Mock
 pub struct SGen<A>(Rc<dyn Fn(i32) -> Gen<A>>);
+# fn main() {}
 ```
 
 `SGen` allows us to define generators that adapt to a requested size. `Prop` then iterates through sizes up to a maximum, ensuring we test small cases first.
@@ -75,6 +88,15 @@ We reuse `SimpleRNG` from Chapter 6. A key challenge in Rust is that `RNG` is a 
 ## 8.4 Example: Verifying `List::reverse`
 
 ```rust
+# struct SGen<A>(A);
+# impl<A> SGen<A> { fn list_of(g: Gen<A>) -> SGen<Vec<A>> { SGen(Vec::new()) } }
+# struct Gen<A>(A);
+# impl<A> Gen<A> { fn choose(start: i32, stop: i32) -> Gen<i32> { Gen(0) } }
+# struct SimpleRNG; impl SimpleRNG { fn new(s: i64) -> Self { SimpleRNG } }
+# struct Result; impl Result { fn is_falsified(&self) -> bool { false } }
+# struct Prop; impl Prop { fn check(&self, a: i32, b: i32, rng: SimpleRNG) -> Result { Result } }
+# fn for_all_sgen<A, F>(g: SGen<A>, f: F) -> Prop where F: Fn(A) -> bool { Prop }
+
 #[test]
 fn test_list_reverse() {
     let small_int = Gen::<i32>::choose(0, 100);
@@ -89,6 +111,7 @@ fn test_list_reverse() {
     let result = reverse_prop.check(10, 100, SimpleRNG::new(42));
     assert!(!result.is_falsified());
 }
+# fn main() {} // Tests don't run in main usually but good to have
 ```
 
 This ensures that for any generated list of integers, reversing it twice yields the original list. If we tried this with a broken reverse implementation, `Prop` would find a counter-example (e.g., `[0, 1]`) and report it.

@@ -20,6 +20,7 @@ pub enum Process<I, O> {
     Await(Box<dyn FnOnce(Option<I>) -> Process<I, O>>),
     Halt,
 }
+# fn main() {}
 ```
 
 This is a **Pull-based** stream. The driver calls the process; if the process is `Emit`ting, the driver collects the value. If the process is `Await`ing, the driver fetches inputs (e.g., from a file) and feeds them in.
@@ -29,9 +30,16 @@ This is a **Pull-based** stream. The driver calls the process; if the process is
 The true power comes from `pipe`. We can feed the output of one process into the input of another.
 
 ```rust
+# enum Process<I, O> { Emit(O, Box<Process<I, O>>), Await(Box<dyn FnOnce(Option<I>) -> Process<I, O>>), Halt }
+# impl<I, O> Process<I, O> {
+#     fn filter<F>(_: F) -> Process<I, I> where F: Fn(&I) -> bool { Process::Halt }
+#     fn lift<F>(_: F) -> Process<I, O> where F: Fn(I) -> O { Process::Halt }
+#     fn pipe<O2>(self, _: Process<O, O2>) -> Process<I, O2> { Process::Halt }
+# }
 let p1 = Process::filter(|x| x % 2 == 0); // Producers/Transducers
-let p2 = Process::lift(|x| x * 10);
+let p2 = Process::lift(|x: i32| x * 10);
 let pipeline = p1.pipe(p2); // Fused Process
+# fn main() {}
 ```
 
 The `pipe` implementation fuses the two machines into one. It runs `p2` until `p2` awaits input, then run `p1` to produce that input. This ensures **constant memory usage** (processing one element at a time) for arbitrary pipelines.

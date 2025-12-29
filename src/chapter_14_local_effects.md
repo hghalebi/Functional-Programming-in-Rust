@@ -16,22 +16,30 @@ We implemented `ST<'a, A>` where `'a` represents the "thread" or scope of the mu
 pub struct ST<'a, A> {
     run: Box<dyn FnOnce() -> A + 'a>, // Closure capturing mutable 'a references
 }
+# fn main() {}
 ```
 
 ### Preventing Leakage
 The danger is leaking a mutable reference:
-```rust
+```rust,compile_fail
+# struct STRef<'a, T>(std::marker::PhantomData<&'a T>);
+# impl<'a, T> STRef<'a, T> { fn new(_: T) -> Self { STRef(std::marker::PhantomData) } }
+# struct ST<'a, A>(std::marker::PhantomData<&'a A>);
+# fn run_st<A>(_: STRef) { }
 let r = run_st(STRef::new(1)); // ERROR! Result cannot be STRef
+# fn main() {}
 ```
 
 In Rust, we prevent this using Higher-Rank Trait Bounds (HRTB) in the `run_st` function:
 
 ```rust
+# struct ST<'a, A>(std::marker::PhantomData<&'a A>);
 pub trait RunnableST<A> {
     fn apply<'a>(&self) -> ST<'a, A>;
 }
 
-pub fn run_st<A>(st: &impl RunnableST<A>) -> A { ... }
+pub fn run_st<A>(st: &impl RunnableST<A>) -> A { unimplemented!() }
+# fn main() {}
 ```
 
 Because `run_st` enforces that `RunnableST` works for *any* `'a` (`for<'a>`), the return type `A` cannot depend on `'a`. `STRef<'a, T>` depends on `'a`, so it cannot be returned. `Vec<T>` (via `freeze()`) does *not* depend on `'a`, so it is safe to return.

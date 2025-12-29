@@ -24,6 +24,10 @@ impl<A> Default for List<A> {
         Nil
     }
 }
+# fn main() {
+#     let list: List<i32> = List::Cons(1, Rc::new(List::Nil));
+#     println!("{:?}", list);
+# }
 ```
 
 Let’s look at the definition. `enum List` has two variants: `Nil` (empty) and `Cons` (non-empty). `Cons` holds a value of type `A` and a reference-counted pointer `Rc` to the rest of the list.
@@ -36,6 +40,9 @@ When we add an element `1` to the front of an existing list `xs`, we return a ne
 Rust supports pattern matching via `match`.
 
 ```rust
+# use std::rc::Rc;
+# enum List<A> { Nil, Cons(A, Rc<List<A>>) }
+# use List::*;
 pub fn sum(ints: &List<i32>) -> i32 {
     match ints {
         Nil => 0,
@@ -50,6 +57,10 @@ pub fn product(ds: &List<f64>) -> f64 {
         Cons(x, xs) => x * product(xs),
     }
 }
+# fn main() {
+#     let list = Cons(1, Rc::new(Cons(2, Rc::new(Nil))));
+#     assert_eq!(sum(&list), 3);
+# }
 ```
 
 ### Exercise 3.1
@@ -62,12 +73,19 @@ What will be the result of the match expression?
 Implement the function `tail` for removing the first element of a List. Note that the function takes constant time.
 
 ```rust
+# use std::rc::Rc;
+# enum List<A> { Nil, Cons(A, Rc<List<A>>) }
+# use List::*;
 pub fn tail<A>(l: &List<A>) -> Option<&Rc<List<A>>> {
     match l {
         Nil => None,
         Cons(_, xs) => Some(xs),
     }
 }
+# fn main() {
+#    let list = Cons(1, Rc::new(Nil));
+#    assert!(tail(&list).is_some());
+# }
 ```
 *Note: In Rust, returning a reference to the tail `&Rc` works if we borrow the input. To return an owned persistent list, we would return `Rc<List<A>>` by cloning the pointer (cheap).*
 
@@ -75,6 +93,9 @@ pub fn tail<A>(l: &List<A>) -> Option<&Rc<List<A>>> {
 Implement `set_head`.
 
 ```rust
+# use std::rc::Rc;
+# #[derive(Debug)] enum List<A> { Nil, Cons(A, Rc<List<A>>) }
+# use List::*;
 pub fn set_head<A>(l: &List<A>, h: A) -> List<A> 
 where A: Clone {
     match l {
@@ -82,12 +103,20 @@ where A: Clone {
         Cons(_, xs) => Cons(h, xs.clone()),
     }
 }
+# fn main() {
+#    let list = Cons(1, Rc::new(Nil));
+#    let new_list = set_head(&list, 2);
+#    // println!("{:?}", new_list); 
+# }
 ```
 
 ### Exercise 3.4: Drop
 Generalize `tail` to `drop`.
 
 ```rust
+# use std::rc::Rc;
+# enum List<A> { Nil, Cons(A, Rc<List<A>>) }
+# use List::*;
 pub fn drop<A>(l: &List<A>, n: usize) -> &List<A> {
     if n == 0 {
         return l;
@@ -97,10 +126,14 @@ pub fn drop<A>(l: &List<A>, n: usize) -> &List<A> {
         Cons(_, xs) => drop(xs, n - 1),
     }
 }
+# fn main() {}
 ```
 
 ### Exercise 3.5: DropWhile
 ```rust
+# use std::rc::Rc;
+# enum List<A> { Nil, Cons(A, Rc<List<A>>) }
+# use List::*;
 pub fn drop_while<A, F>(l: &List<A>, f: F) -> &List<A> 
 where F: Fn(&A) -> bool {
     match l {
@@ -108,6 +141,7 @@ where F: Fn(&A) -> bool {
         _ => l,
     }
 }
+# fn main() {}
 ```
 
 ### Exercise 3.6: Init
@@ -115,6 +149,9 @@ Implement a function `init` that returns a List consisting of all but the last e
 *Why can't this be constant time? Because we must rebuild the path to the new end.*
 
 ```rust
+# use std::rc::Rc;
+# enum List<A> { Nil, Cons(A, Rc<List<A>>) }
+# use List::*;
 pub fn init<A: Clone>(l: &List<A>) -> List<A> {
     match l {
         Nil => panic!("init of empty list"),
@@ -122,6 +159,7 @@ pub fn init<A: Clone>(l: &List<A>) -> List<A> {
         Cons(h, xs) => Cons(h.clone(), Rc::new(init(xs))),
     }
 }
+# fn main() {}
 ```
 
 ## 3.4 Recursion over lists and generalizing to higher-order functions
@@ -130,13 +168,21 @@ pub fn init<A: Clone>(l: &List<A>) -> List<A> {
 
 **Exercise 3.9: Length using fold_right**
 ```rust
+# use std::rc::Rc;
+# #[derive(Clone)] enum List<A> { Nil, Cons(A, Rc<List<A>>) }
+# use List::*;
+# fn fold_right<A, B, F>(l: &List<A>, z: B, f: F) -> B where F: Fn(&A, B) -> B + Clone { match l { Nil => z, Cons(h, t) => f(h, fold_right(t, z, f)) } } 
 pub fn length<A>(l: &List<A>) -> usize {
     fold_right(l, 0, |_, acc| acc + 1)
 }
+# fn main() {}
 ```
 
 **Exercise 3.10: Fold Left (Tail recursive)**
 ```rust
+# use std::rc::Rc;
+# #[derive(Clone)] enum List<A> { Nil, Cons(A, Rc<List<A>>) }
+# use List::*;
 pub fn fold_left<A, B, F>(l: &List<A>, z: B, f: F) -> B 
 where F: Fn(B, &A) -> B {
     match l {
@@ -144,13 +190,19 @@ where F: Fn(B, &A) -> B {
         Cons(h, t) => fold_left(t, f(z, h), f),
     }
 }
+# fn main() {}
 ```
 
 **Exercise 3.12: Reverse**
 ```rust
+# use std::rc::Rc;
+# #[derive(Clone)] enum List<A> { Nil, Cons(A, Rc<List<A>>) }
+# use List::*;
+# pub fn fold_left<A, B, F>(l: &List<A>, z: B, f: F) -> B where F: Fn(B, &A) -> B { match l { Nil => z, Cons(h, t) => fold_left(t, f(z, h), f), } }
 pub fn reverse<A: Clone>(l: &List<A>) -> List<A> {
     fold_left(l, Nil, |acc, h| Cons(h.clone(), Rc::new(acc)))
 }
+# fn main() {}
 ```
 
 ## 3.5 Trees
@@ -162,31 +214,37 @@ pub enum Tree<A> {
     Leaf(A),
     Branch(Box<Tree<A>>, Box<Tree<A>>),
 }
+# fn main() {}
 ```
 *Note: For Trees, `Box` (unique ownership) is often sufficient unless we need DAGs or explicit sharing.*
 
 ### Exercise 3.25: Size
 ```rust
+# enum Tree<A> { Leaf(A), Branch(Box<Tree<A>>, Box<Tree<A>>) }
 pub fn size<A>(t: &Tree<A>) -> usize {
     match t {
         Tree::Leaf(_) => 1,
         Tree::Branch(l, r) => 1 + size(l) + size(r),
     }
 }
+# fn main() {}
 ```
 
 ### Exercise 3.26: Maximum
 ```rust
+# enum Tree<A> { Leaf(A), Branch(Box<Tree<A>>, Box<Tree<A>>) }
 pub fn maximum(t: &Tree<i32>) -> i32 {
     match t {
         Tree::Leaf(v) => *v,
         Tree::Branch(l, r) => maximum(l).max(maximum(r)),
     }
 }
+# fn main() {}
 ```
 
 ### Exercise 3.28: Map
 ```rust
+# enum Tree<A> { Leaf(A), Branch(Box<Tree<A>>, Box<Tree<A>>) }
 pub fn map<A, B, F>(t: &Tree<A>, f: &F) -> Tree<B>
 where F: Fn(&A) -> B {
     match t {
@@ -194,6 +252,7 @@ where F: Fn(&A) -> B {
         Tree::Branch(l, r) => Tree::Branch(Box::new(map(l, f)), Box::new(map(r, f))),
     }
 }
+# fn main() {}
 ```
 
 ## 3.6 Summary
