@@ -1,6 +1,6 @@
 # Summary
 
-[Introduction](chapter_1_introduction.md)
+[Agentic Introduction](chapter_1_introduction.md)
 [Getting Started](chapter_2_getting_started.md)
 [Functional Data Structures](chapter_3_functional_data_structures.md)
 [Handling Errors](chapter_4_handling_errors.md)
