@@ -7,6 +7,7 @@ description = "A pedagogical guide inspired by the Red Book and Rust resources."
 language = "en"
 multilingual = false
 src = "src"
+site-url = "/Functional-Programming-in-Rust/"
 
 [build]
 build-dir = "book"
