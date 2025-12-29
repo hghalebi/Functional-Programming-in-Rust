@@ -1,4 +1,6 @@
 # Chapter 1: What is functional programming?
+> *Last Updated: 2025-12-29*
+
 
 Functional programming (FP) is based on a simple premise with far-reaching implications: we construct our programs using only pure functions—in other words, functions that have no side effects. What are side effects? A function has a side effect if it does something other than simply return a result, for example:
 
