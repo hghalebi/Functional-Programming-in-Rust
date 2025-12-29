@@ -173,106 +173,89 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-8-property-based-testing"><a class="header" href="#chapter-8-property-based-testing">Chapter 8: Property-Based Testing</a></h1>
-<p>In this chapter, we design a library for <strong>Property-Based Testing</strong>, similar to QuickCheck or ScalaCheck. The goal is to separate the <em>specification</em> of program behavior from the <em>generation</em> of test cases.</p>
-<p>Instead of writing individual test scenarios (e.g., "reversing [1, 2, 3] yields [3, 2, 1]"), we define properties that should hold for <em>all</em> inputs (e.g., "reversing a list twice yields the original list"). The library then automatically generates random inputs to verify these properties.</p>
-<h2 id="81-data-types-for-testing"><a class="header" href="#81-data-types-for-testing">8.1 Data Types for Testing</a></h2>
+                        <h1 id="chapter-8-eval-benchmarks-property-based-testing"><a class="header" href="#chapter-8-eval-benchmarks-property-based-testing">Chapter 8: Eval Benchmarks (Property-Based Testing)</a></h1>
+<p>In this chapter, we design a library for <strong>Agent Evals</strong>, similar to Property-Based Testing. The goal is to separate the <em>specification</em> of robust agent behavior from the <em>generation</em> of test cases.</p>
+<p>Instead of writing individual test scenarios (e.g., "Ask about Paris weather"), we define <strong>Invariants</strong> that should hold for <em>all</em> inputs (e.g., "The response must always be valid JSON" or "The tool call must contain required arguments"). The library then automatically generates random inputs (Mock Prompts) to verify these properties.</p>
+<h2 id="81-data-types-for-evals"><a class="header" href="#81-data-types-for-evals">8.1 Data Types for Evals</a></h2>
 <p>We need two core data types:</p>
 <ol>
-<li><strong><code>Gen&lt;A&gt;</code></strong>: A generator that knows how to produce values of type <code>A</code>.</li>
-<li><strong><code>Prop</code></strong>: A property that can be checked, resulting in success or failure.</li>
+<li><strong><code>TestCaseGenerator&lt;A&gt;</code></strong>: A tool that knows how to produce mock inputs of type <code>A</code> (e.g. valid User Queries, malicious prompt injections, etc.).</li>
+<li><strong><code>EvalMetric</code></strong>: A property that can be checked, resulting in Pass/Fail.</li>
 </ol>
-<h3 id="811-generators-gen"><a class="header" href="#811-generators-gen">8.1.1 Generators (<code>Gen</code>)</a></h3>
-<p>A generator is essentially a state transition over a random number generator. In Chapter 6, we built <code>State&lt;RNG, A&gt;</code>. <code>Gen&lt;A&gt;</code> is simply a wrapper around this state.</p>
+<h3 id="811-generators-testcasegenerator"><a class="header" href="#811-generators-testcasegenerator">8.1.1 Generators (<code>TestCaseGenerator</code>)</a></h3>
+<p>A generator is essentially a state transition over a random number generator (MockLLM).</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">struct State&lt;S, A&gt;(Box&lt;dyn Fn(S) -&gt; (A, S)&gt;);
-</span><span class="boring">struct SimpleRNG;
-</span>pub struct Gen&lt;A&gt;(State&lt;SimpleRNG, A&gt;);
+</span><span class="boring">struct SimpleMockLLM;
+</span>pub struct TestCaseGenerator&lt;A&gt;(State&lt;SimpleMockLLM, A&gt;);
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>This allows us to leverage all the combinators we wrote for <code>State</code>, like <code>map</code> and <code>flat_map</code>, to compose complex generators from simple ones.</p>
+<p>This allows us to leverage all the combinators we wrote for <code>Agent&lt;S, A&gt;</code>, like <code>map</code> and <code>flat_map</code>, to compose complex test cases.</p>
 <h4 id="primitives"><a class="header" href="#primitives">Primitives</a></h4>
 <ul>
-<li><strong><code>choose(start, stop)</code></strong>: Generates an integer in a range.</li>
-<li><strong><code>unit(a)</code></strong>: Always generates the value <code>a</code>.</li>
-<li><strong><code>boolean()</code></strong>: Generates a random boolean.</li>
+<li><strong><code>choose(start, stop)</code></strong>: Generates a random number (token).</li>
+<li><strong><code>weighted_boolean(p)</code></strong>: Generates true with probability <code>p</code> (e.g. simulate tool failure).</li>
 </ul>
 <h4 id="combinators"><a class="header" href="#combinators">Combinators</a></h4>
 <ul>
-<li><strong><code>list_of_n(n, gen)</code></strong>: Generates a list of length <code>n</code> using the given generator.</li>
-<li><strong><code>flat_map</code></strong>: Allows a generator to depend on the output of another generator.</li>
+<li><strong><code>list_of_n(n, gen)</code></strong>: Generates a conversation of length <code>n</code>.</li>
+<li><strong><code>flat_map</code></strong>: Allows a test case to depend on the output of another (e.g. generate a Tool Call, then generate a valid Output for it).</li>
 </ul>
-<h3 id="812-properties-prop"><a class="header" href="#812-properties-prop">8.1.2 Properties (<code>Prop</code>)</a></h3>
-<p>A property is something we can check. A simple boolean <code>check</code> is insufficient because we want to know <em>why</em> it failed (the counter-example) and how many tests passed.</p>
-<p>Our <code>Prop</code> type encapsulates a function that takes configuration (max size, number of test cases) and a source of randomness, returning a <code>Result</code>.</p>
+<h3 id="812-properties-evalmetric"><a class="header" href="#812-properties-evalmetric">8.1.2 Properties (<code>EvalMetric</code>)</a></h3>
+<p>An eval metric is something we can check. A simple boolean <code>check</code> is insufficient because we want to know <em>why</em> it failed (the specific prompt that broke the agent) and how many tests passed.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">struct MaxSize(i32);
 </span><span class="boring">struct TestCases(i32);
-</span><span class="boring">struct SimpleRNG;
+</span><span class="boring">struct SimpleMockLLM;
 </span><span class="boring">struct FailedCase(String);
 </span><span class="boring">struct SuccessCount(i32);
-</span>pub struct Prop(Rc&lt;dyn Fn(MaxSize, TestCases, SimpleRNG) -&gt; Result&gt;);
+</span>pub struct EvalMetric(Rc&lt;dyn Fn(MaxSize, TestCases, SimpleMockLLM) -&gt; EvalResult&gt;);
 
-pub enum Result {
+pub enum EvalResult {
     Passed,
     Falsified(FailedCase, SuccessCount),
     Proved,
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>We use <code>Rc&lt;dyn Fn...&gt;</code> to allow properties to be cloned and shared, which is essential when combining them (e.g., <code>prop1.and(prop2)</code>).</p>
 <h2 id="82-test-case-minimization"><a class="header" href="#82-test-case-minimization">8.2 Test Case Minimization</a></h2>
-<p>Debugging failures on massive inputs is hard. There are two main approaches to minimization:</p>
+<p>Debugging agent failures on massive context windows is hard. There are two main approaches:</p>
 <ol>
-<li><strong>Shrinking</strong>: Find a failure, then iteratively "shrink" the input to find a smaller failing case. (Used by QuickCheck/ScalaCheck).</li>
-<li><strong>Sized Generation</strong>: Start with small inputs and gradually increase size. The first failure found is naturally small. (Used to some extent in Hedgehog).</li>
+<li><strong>Shrinking</strong>: Find a failure (long context), then iteratively remove messages to look for the root cause.</li>
+<li><strong>Sized Generation</strong>: Start with short contexts and gradually increase size.</li>
 </ol>
-<p>We implement <strong>Sized Generation</strong> via <code>SGen</code>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
-</span><span class="boring">struct Gen&lt;A&gt;(A); // Mock
-</span>pub struct SGen&lt;A&gt;(Rc&lt;dyn Fn(i32) -&gt; Gen&lt;A&gt;&gt;);
-<span class="boring">fn main() {}</span></code></pre></pre>
-<p><code>SGen</code> allows us to define generators that adapt to a requested size. <code>Prop</code> then iterates through sizes up to a maximum, ensuring we test small cases first.</p>
-<h2 id="83-the-rust-implementation"><a class="header" href="#83-the-rust-implementation">8.3 The Rust Implementation</a></h2>
-<h3 id="ownership-and-closures"><a class="header" href="#ownership-and-closures">Ownership and Closures</a></h3>
-<p>Unlike Scala, Rust requires explicit management of ownership.</p>
-<ul>
-<li><strong><code>Gen</code></strong>: Wraps <code>State</code>, which uses <code>Rc</code> internally in our Ch 6 implementation. This makes <code>Gen</code> cheap to clone.</li>
-<li><strong><code>Prop</code></strong>: Uses <code>Rc&lt;dyn Fn...&gt;</code> to store the check logic.</li>
-<li><strong>Laziness</strong>: In Scala, <code>check(true)</code> is lazy by name. In Rust, we pass a closure <code>check(|| true)</code> to prevent immediate execution.</li>
-</ul>
-<h3 id="random-number-generation"><a class="header" href="#random-number-generation">Random Number Generation</a></h3>
-<p>We reuse <code>SimpleRNG</code> from Chapter 6. A key challenge in Rust is that <code>RNG</code> is a trait. Passing <code>dyn RNG</code> around can be tricky due to object safety rules (especially if methods return <code>Box&lt;dyn RNG&gt;</code>). For this chapter, we specialized our implementation to use <code>SimpleRNG</code> directly to keep the focus on the property testing logic rather than generic trait juggling.</p>
-<h2 id="84-example-verifying-listreverse"><a class="header" href="#84-example-verifying-listreverse">8.4 Example: Verifying <code>List::reverse</code></a></h2>
+<h2 id="83-example-verifying-jsontool-robustness"><a class="header" href="#83-example-verifying-jsontool-robustness">8.3 Example: Verifying <code>JsonTool</code> Robustness</a></h2>
+<p>Let's test if a <code>JsonTool</code> behaves correctly: "For any Valid JSON object, parsing it and then serializing it should yield the original object (semantically)."</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">struct SGen&lt;A&gt;(A);
-</span><span class="boring">impl&lt;A&gt; SGen&lt;A&gt; { fn list_of(g: Gen&lt;A&gt;) -&gt; SGen&lt;Vec&lt;A&gt;&gt; { SGen(Vec::new()) } }
-</span><span class="boring">struct Gen&lt;A&gt;(A);
-</span><span class="boring">impl&lt;A&gt; Gen&lt;A&gt; { fn choose(start: i32, stop: i32) -&gt; Gen&lt;i32&gt; { Gen(0) } }
-</span><span class="boring">struct SimpleRNG; impl SimpleRNG { fn new(s: i64) -&gt; Self { SimpleRNG } }
-</span><span class="boring">struct Result; impl Result { fn is_falsified(&amp;self) -&gt; bool { false } }
-</span><span class="boring">struct Prop; impl Prop { fn check(&amp;self, a: i32, b: i32, rng: SimpleRNG) -&gt; Result { Result } }
-</span><span class="boring">fn for_all_sgen&lt;A, F&gt;(g: SGen&lt;A&gt;, f: F) -&gt; Prop where F: Fn(A) -&gt; bool { Prop }
+</span><span class="boring">impl&lt;A&gt; SGen&lt;A&gt; { fn list_of(g: TestCaseGenerator&lt;A&gt;) -&gt; SGen&lt;Vec&lt;A&gt;&gt; { SGen(Vec::new()) } }
+</span><span class="boring">struct TestCaseGenerator&lt;A&gt;(A);
+</span><span class="boring">impl&lt;A&gt; TestCaseGenerator&lt;A&gt; { fn choose(start: i32, stop: i32) -&gt; TestCaseGenerator&lt;i32&gt; { TestCaseGenerator(0) } }
+</span><span class="boring">struct SimpleMockLLM; impl SimpleMockLLM { fn new(s: i64) -&gt; Self { SimpleMockLLM } }
+</span><span class="boring">struct EvalResult; impl EvalResult { fn is_falsified(&amp;self) -&gt; bool { false } }
+</span><span class="boring">struct EvalMetric; impl EvalMetric { fn check(&amp;self, a: i32, b: i32, rng: SimpleMockLLM) -&gt; EvalResult { EvalResult } }
+</span><span class="boring">fn for_all_sgen&lt;A, F&gt;(g: SGen&lt;A&gt;, f: F) -&gt; EvalMetric where F: Fn(A) -&gt; bool { EvalMetric }
 </span>
 #[test]
-fn test_list_reverse() {
-    let small_int = Gen::&lt;i32&gt;::choose(0, 100);
-    let reverse_prop = for_all_sgen(SGen::list_of(small_int), |ns: Vec&lt;i32&gt;| {
-        let mut rev = ns.clone();
-        rev.reverse();
-        let mut revrev = rev.clone();
-        revrev.reverse();
-        ns == revrev
+fn test_json_integrity() {
+    let small_int = TestCaseGenerator::&lt;i32&gt;::choose(0, 100);
+    // Pretend this generates JSON vectors
+    let json_prop = for_all_sgen(SGen::list_of(small_int), |data: Vec&lt;i32&gt;| {
+        let serialized = format!("{:?}", data);
+        // Simulate parsing
+        let parsed: Vec&lt;i32&gt; = serialized.trim_matches(|c| c == '[' || c == ']').split(", ").map(|s| s.parse().unwrap_or(0)).collect();
+        data == parsed
     });
-    // Run the check
-    let result = reverse_prop.check(10, 100, SimpleRNG::new(42));
+    
+    // Run the eval
+    let result = json_prop.check(10, 100, SimpleMockLLM::new(42));
     assert!(!result.is_falsified());
 }
-<span class="boring">fn main() {} // Tests don't run in main usually but good to have</span></code></pre></pre>
-<p>This ensures that for any generated list of integers, reversing it twice yields the original list. If we tried this with a broken reverse implementation, <code>Prop</code> would find a counter-example (e.g., <code>[0, 1]</code>) and report it.</p>
+<span class="boring">fn main() {} </span></code></pre></pre>
+<p>This ensures that for any generated data structure, our "Agent" (Parser) preserves integrity.</p>
 <h2 id="85-summary"><a class="header" href="#85-summary">8.5 Summary</a></h2>
-<p>We have built a powerful testing library from scratch. It demonstrates how functional design principles (composition, pure functions) apply to domain-specific languages like testing frameworks.</p>
+<p>We have built a powerful Eval framework. It demonstrates how functional design principles apply to verifying Agent behavior.</p>
 <h2 id="86-references"><a class="header" href="#86-references">8.6 References</a></h2>
 <ul>
 <li><strong>Rust Book Ch 11 (Testing)</strong>: <a href="https://doc.rust-lang.org/book/ch11-00-testing.html">The Rust Programming Language</a></li>
 <li><strong>Rust By Example (Testing)</strong>: <a href="https://doc.rust-lang.org/rust-by-example/testing.html">Testing</a></li>
-<li><strong>Proptest (Crate)</strong>: <a href="https://altsysrq.github.io/proptest-book/intro.html">Official Book</a> - Real-world Property Testing in Rust.</li>
+<li><strong>Proptest (Crate)</strong>: <a href="https://altsysrq.github.io/proptest-book/intro.html">Official Book</a></li>
 </ul>
 
                     </main>

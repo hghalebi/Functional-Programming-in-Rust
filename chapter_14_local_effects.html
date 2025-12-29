@@ -173,50 +173,31 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-14-local-effects-and-mutable-state"><a class="header" href="#chapter-14-local-effects-and-mutable-state">Chapter 14: Local Effects and Mutable State</a></h1>
-<p>In functional programming, we emphasize immutability. However, some algorithms (like Quicksort, HashMaps, or graph traversals) are naturally expressed with mutable state. The types <code>ST</code> (State Thread) and <code>STRef</code> allow us to use mutable state <em>locally</em> while remaining externally pure.</p>
-<h2 id="141-purely-functional-in-place-mutation"><a class="header" href="#141-purely-functional-in-place-mutation">14.1 Purely Functional In-Place Mutation?</a></h2>
+                        <h1 id="chapter-14-scratchpads-local-effects"><a class="header" href="#chapter-14-scratchpads-local-effects">Chapter 14: Scratchpads (Local Effects)</a></h1>
+<p>In Agentic programming, we maintain purity in our interfaces ("Input -&gt; Output"). However, some internal reasoning steps (like sorting evidence, accumulating stats, or graph search) are naturally expressed with mutable state. The types <code>Scratchpad</code> (ST) and <code>ScratchRef</code> allow an Agent to use mutable memory <em>locally</em> while remaining externally pure.</p>
+<h2 id="141-purely-functional-in-place-reasoning"><a class="header" href="#141-purely-functional-in-place-reasoning">14.1 Purely Functional In-Place Reasoning?</a></h2>
 <p>It sounds like a contradiction. How can we have mutation in a pure function?
 The key is <strong>Scope</strong>.
-If a function allocates a mutable array, modifies it, and then returns a frozen (immutable) copy (or a result derived from it), and <em>no one else</em> ever saw the mutable version, then the function is pure from the outside.</p>
-<h2 id="142-the-st-monad-in-rust"><a class="header" href="#142-the-st-monad-in-rust">14.2 The ST Monad in Rust</a></h2>
-<p>We implemented <code>ST&lt;'a, A&gt;</code> where <code>'a</code> represents the "thread" or scope of the mutation.</p>
-<pre><pre class="playground"><code class="language-rust">pub struct ST&lt;'a, A&gt; {
+If an Agent allocates a mutable "Scratchpad", scribbles on it, and then returns a frozen summary, and <em>no one else</em> ever saw the scratchpad, then the Agent appears pure from the outside.</p>
+<h2 id="142-the-scratchpad-monad"><a class="header" href="#142-the-scratchpad-monad">14.2 The Scratchpad Monad</a></h2>
+<p>We implemented <code>Scratchpad&lt;'a, A&gt;</code> where <code>'a</code> represents the "thread" or scope of the scratchpad.</p>
+<pre><pre class="playground"><code class="language-rust">pub struct Scratchpad&lt;'a, A&gt; {
     run: Box&lt;dyn FnOnce() -&gt; A + 'a&gt;, // Closure capturing mutable 'a references
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="preventing-leakage"><a class="header" href="#preventing-leakage">Preventing Leakage</a></h3>
-<p>The danger is leaking a mutable reference:</p>
-<pre><pre class="playground"><code class="language-rust compile_fail"><span class="boring">struct STRef&lt;'a, T&gt;(std::marker::PhantomData&lt;&amp;'a T&gt;);
-</span><span class="boring">impl&lt;'a, T&gt; STRef&lt;'a, T&gt; { fn new(_: T) -&gt; Self { STRef(std::marker::PhantomData) } }
-</span><span class="boring">struct ST&lt;'a, A&gt;(std::marker::PhantomData&lt;&amp;'a A&gt;);
-</span><span class="boring">fn run_st&lt;A&gt;(_: STRef) { }
-</span>let r = run_st(STRef::new(1)); // ERROR! Result cannot be STRef
+<h3 id="preventing-leakage-data-privacy"><a class="header" href="#preventing-leakage-data-privacy">Preventing Leakage (Data Privacy)</a></h3>
+<p>The danger is leaking a mutable reference to the global scope (Hallucinating internal state into the final answer).
+Rust's Higher-Rank Trait Bounds (HRTB) prevent this leakage. The phantom lifetime <code>'a</code> ensures that <code>ScratchRef</code> cannot escape the <code>run_scratchpad</code> block.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct ScratchRef&lt;'a, T&gt;(std::marker::PhantomData&lt;&amp;'a T&gt;);
+</span><span class="boring">impl&lt;'a, T&gt; ScratchRef&lt;'a, T&gt; { fn new(_: T) -&gt; Self { ScratchRef(std::marker::PhantomData) } }
+</span><span class="boring">struct Scratchpad&lt;'a, A&gt;(std::marker::PhantomData&lt;&amp;'a A&gt;);
+</span><span class="boring">fn run_scratchpad&lt;A, T&gt;(_: ScratchRef&lt;'_, T&gt;) { }
+</span>// let leaking_ref = run_scratchpad(ScratchRef::new(1)); // ERROR! Result cannot be ScratchRef
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>In Rust, we prevent this using Higher-Rank Trait Bounds (HRTB) in the <code>run_st</code> function:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">struct ST&lt;'a, A&gt;(std::marker::PhantomData&lt;&amp;'a A&gt;);
-</span>pub trait RunnableST&lt;A&gt; {
-    fn apply&lt;'a&gt;(&amp;self) -&gt; ST&lt;'a, A&gt;;
-}
-
-pub fn run_st&lt;A&gt;(st: &amp;impl RunnableST&lt;A&gt;) -&gt; A { unimplemented!() }
-<span class="boring">fn main() {}</span></code></pre></pre>
-<p>Because <code>run_st</code> enforces that <code>RunnableST</code> works for <em>any</em> <code>'a</code> (<code>for&lt;'a&gt;</code>), the return type <code>A</code> cannot depend on <code>'a</code>. <code>STRef&lt;'a, T&gt;</code> depends on <code>'a</code>, so it cannot be returned. <code>Vec&lt;T&gt;</code> (via <code>freeze()</code>) does <em>not</em> depend on <code>'a</code>, so it is safe to return.</p>
 <h2 id="143-comparison-with-rust-references"><a class="header" href="#143-comparison-with-rust-references">14.3 Comparison with Rust References</a></h2>
-<p>Rust's borrow checker provides similar guarantees natively:</p>
-<ul>
-<li><code>&amp;mut T</code> ensures exclusive access (effectively a local state thread).</li>
-<li>Lifetimes (<code>'a</code>) ensure references don't escape their owner.</li>
-</ul>
-<p>In a sense, <strong>Rust is the ST Monad</strong>. Every block of code with local variables is an implicit <code>ST</code> computation. However, the explicit <code>ST</code> monad is useful when we want to treat "stateful computations" as First-Class Values (e.g., to pass them around, combine them safely, or implement "Ghost Types" patterns).</p>
+<p>In a sense, <strong>Rust is the Scratchpad Monad</strong>. Every block of code with local variables is an implicit <code>Scratchpad</code> computation. However, the explicit <code>Scratchpad</code> monad is useful when we want to treat "stateful reasoning" as First-Class Values.</p>
 <h2 id="144-conclusion"><a class="header" href="#144-conclusion">14.4 Conclusion</a></h2>
-<p>We now have the ability to write efficient, in-place algorithms (like the <code>partition</code> step of Quicksort) using the <code>ST</code> monad, wrapping them safely so they appear pure to the rest of the program.</p>
-<h2 id="145-rust-equivalents"><a class="header" href="#145-rust-equivalents">14.5 Rust Equivalents</a></h2>
-<ul>
-<li><strong>Smart Pointers</strong>: <a href="https://doc.rust-lang.org/book/ch15-00-smart-pointers.html">The Rust Book Ch 15</a></li>
-<li><strong>Interior Mutability (<code>RefCell</code>)</strong>: <a href="https://doc.rust-lang.org/book/ch15-05-interior-mutability.html">The Rust Book Ch 15.5</a></li>
-<li><strong>Lifetimes</strong>: <a href="https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html">The Rust Book Ch 10.3</a></li>
-</ul>
+<p>We now have the ability to write efficient, in-place algorithms (like "Evidence Sorting") using the <code>Scratchpad</code> monad, wrapping them safely so they appear pure to the rest of the orchestration system.</p>
 
                     </main>
 

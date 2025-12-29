@@ -173,11 +173,11 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-4-handling-errors-without-exceptions"><a class="header" href="#chapter-4-handling-errors-without-exceptions">Chapter 4: Handling errors without exceptions</a></h1>
-<p>Throwing exceptions is a side effect. In functional programming, we prefer to representing failures and exceptions with ordinary values. This preserves referential transparency.</p>
-<p>In this chapter, we re-create two standard library types: <code>Option</code> and <code>Either</code>.</p>
+                        <h1 id="chapter-4-handling-hallucinations-error-handling"><a class="header" href="#chapter-4-handling-hallucinations-error-handling">Chapter 4: Handling Hallucinations (Error Handling)</a></h1>
+<p>Throwing exceptions is a side effect. In Agentic programming, we often deal with unreliable components: LLMs hallucinate, Tools fail, and APIs timeout. We prefer representing these failures as <strong>ordinary values</strong>. This preserves referential transparency and allows our Agents to reason about their own failures.</p>
+<p>In this chapter, we re-create two standard library types: <code>Option</code> (Missing values) and <code>Either</code> (Failures with reasons).</p>
 <h2 id="41-the-option-data-type"><a class="header" href="#41-the-option-data-type">4.1 The Option data type</a></h2>
-<p>We represent the possibility of an undefined result with <code>Option</code>.</p>
+<p>We represent the possibility of an undefined result (e.g., "Tool produced no output" or "Regex failed to capture") with <code>Option</code>.</p>
 <pre><pre class="playground"><code class="language-rust">pub enum Option&lt;A&gt; {
     Some(A),
     None,
@@ -199,14 +199,14 @@
     where F: FnOnce(A) -&gt; Option&lt;B&gt; {
         match self {
             Option::Some(a) =&gt; f(a),
-            Option::None =&gt; Option::None,
+            Option::None =&gt; Option::None, // Failure propagates
         }
     }
 
     pub fn get_or_else(self, default: A) -&gt; A {
         match self {
             Option::Some(a) =&gt; a,
-            Option::None =&gt; default,
+            Option::None =&gt; default, // Fallback value
         }
     }
 
@@ -214,7 +214,7 @@
     where F: FnOnce() -&gt; Option&lt;A&gt; {
         match self {
             Option::Some(_) =&gt; self,
-            Option::None =&gt; ob(),
+            Option::None =&gt; ob(), // Try another strategy (Fallback Agent)
         }
     }
 
@@ -227,41 +227,40 @@
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-42-variance"><a class="header" href="#exercise-42-variance">Exercise 4.2: Variance</a></h3>
-<p>Implement <code>variance</code> in terms of <code>flat_map</code>.
-Variance is the mean of <code>math.pow(x - m, 2)</code>.</p>
+<h3 id="exercise-42-variance-latency-analysis"><a class="header" href="#exercise-42-variance-latency-analysis">Exercise 4.2: Variance (Latency Analysis)</a></h3>
+<p>Implement <code>variance</code> for analyzing API latency stability.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] pub enum Option&lt;A&gt; { Some(A), None }
 </span><span class="boring">impl&lt;A&gt; Option&lt;A&gt; { 
 </span><span class="boring">   pub fn flat_map&lt;B, F&gt;(self, f: F) -&gt; Option&lt;B&gt; where F: FnOnce(A) -&gt; Option&lt;B&gt; { match self { Option::Some(a) =&gt; f(a), Option::None =&gt; Option::None } } 
 </span><span class="boring">}
-</span>fn mean(xs: &amp;[f64]) -&gt; Option&lt;f64&gt; {
-    if xs.is_empty() {
+</span>fn average_latency(latencies: &amp;[f64]) -&gt; Option&lt;f64&gt; {
+    if latencies.is_empty() {
         Option::None
     } else {
-        Option::Some(xs.iter().sum::&lt;f64&gt;() / xs.len() as f64)
+        Option::Some(latencies.iter().sum::&lt;f64&gt;() / latencies.len() as f64)
     }
 }
 
-pub fn variance(xs: &amp;[f64]) -&gt; Option&lt;f64&gt; {
-    mean(xs).flat_map(|m| mean(&amp;xs.iter().map(|x| (x - m).powi(2)).collect::&lt;Vec&lt;_&gt;&gt;()))
+pub fn latency_variance(latencies: &amp;[f64]) -&gt; Option&lt;f64&gt; {
+    average_latency(latencies).flat_map(|m| average_latency(&amp;latencies.iter().map(|x| (x - m).powi(2)).collect::&lt;Vec&lt;_&gt;&gt;()))
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-43-map2"><a class="header" href="#exercise-43-map2">Exercise 4.3: Map2</a></h3>
-<p>Combine two Option values.</p>
+<h3 id="exercise-43-map2-combine-tool-outputs"><a class="header" href="#exercise-43-map2-combine-tool-outputs">Exercise 4.3: Map2 (Combine Tool Outputs)</a></h3>
+<p>Combine two Option values (e.g. <code>search_result</code> and <code>weather_data</code>). If either failed, the combination fails.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] pub enum Option&lt;A&gt; { Some(A), None }
 </span><span class="boring">impl&lt;A&gt; Option&lt;A&gt; { 
 </span><span class="boring">   pub fn flat_map&lt;B, F&gt;(self, f: F) -&gt; Option&lt;B&gt; where F: FnOnce(A) -&gt; Option&lt;B&gt; { match self { Option::Some(a) =&gt; f(a), Option::None =&gt; Option::None } } 
 </span><span class="boring">   pub fn map&lt;B, F&gt;(self, f: F) -&gt; Option&lt;B&gt; where F: FnOnce(A) -&gt; B { match self { Option::Some(a) =&gt; Option::Some(f(a)), Option::None =&gt; Option::None } }
 </span><span class="boring">}
-</span>pub fn map2&lt;A, B, C, F&gt;(a: Option&lt;A&gt;, b: Option&lt;B&gt;, f: F) -&gt; Option&lt;C&gt;
+</span>pub fn combine_tool_outputs&lt;A, B, C, F&gt;(a: Option&lt;A&gt;, b: Option&lt;B&gt;, f: F) -&gt; Option&lt;C&gt;
 where F: FnOnce(A, B) -&gt; C {
     a.flat_map(|aa| b.map(|bb| f(aa, bb)))
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-44-sequence"><a class="header" href="#exercise-44-sequence">Exercise 4.4: Sequence</a></h3>
-<p>Combine a list of Options into one Option containing a list.</p>
+<h3 id="exercise-44-sequence-batch-execution"><a class="header" href="#exercise-44-sequence-batch-execution">Exercise 4.4: Sequence (Batch Execution)</a></h3>
+<p>Combine a list of optional results into one Option containing a list. If <em>any</em> tool failed, the whole batch fails.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">pub enum Option&lt;A&gt; { Some(A), None }
-</span>pub fn sequence&lt;A&gt;(a: Vec&lt;Option&lt;A&gt;&gt;) -&gt; Option&lt;Vec&lt;A&gt;&gt; {
+</span>pub fn sequence_results&lt;A&gt;(a: Vec&lt;Option&lt;A&gt;&gt;) -&gt; Option&lt;Vec&lt;A&gt;&gt; {
     let mut res = Vec::new();
     for opt in a {
         match opt {
@@ -272,12 +271,13 @@ where F: FnOnce(A, B) -&gt; C {
     Option::Some(res)
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-45-traverse"><a class="header" href="#exercise-45-traverse">Exercise 4.5: Traverse</a></h3>
+<h3 id="exercise-45-traverse-parallel-execution"><a class="header" href="#exercise-45-traverse-parallel-execution">Exercise 4.5: Traverse (Parallel Execution)</a></h3>
+<p>Map a function (e.g., <code>execute_tool</code>) over a list of inputs.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">pub enum Option&lt;A&gt; { Some(A), None }
-</span>pub fn traverse&lt;A, B, F&gt;(a: Vec&lt;A&gt;, f: F) -&gt; Option&lt;Vec&lt;B&gt;&gt;
+</span>pub fn traverse_executions&lt;A, B, F&gt;(inputs: Vec&lt;A&gt;, f: F) -&gt; Option&lt;Vec&lt;B&gt;&gt;
 where F: Fn(A) -&gt; Option&lt;B&gt; {
     let mut res = Vec::new();
-    for x in a {
+    for x in inputs {
         match f(x) {
             Option::Some(y) =&gt; res.push(y),
             Option::None =&gt; return Option::None,
@@ -287,10 +287,10 @@ where F: Fn(A) -&gt; Option&lt;B&gt; {
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="44-the-either-data-type"><a class="header" href="#44-the-either-data-type">4.4 The Either data type</a></h2>
-<p><code>Option</code> doesn't tell us <em>why</em> something failed. <code>Either</code> lets us track a reason.</p>
+<p><code>Option</code> doesn't tell us <em>why</em> something failed (e.g., "Rate Limit Exceeded" vs "Invalid JSON"). <code>Either</code> lets us track a failure reason.</p>
 <pre><pre class="playground"><code class="language-rust">pub enum Either&lt;E, A&gt; {
-    Left(E),
-    Right(A),
+    Left(E), // The "Error" or "Refusal"
+    Right(A), // The "Success" or "Tool Output"
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-46-basic-functions-on-either"><a class="header" href="#exercise-46-basic-functions-on-either">Exercise 4.6: Basic Functions on Either</a></h3>
@@ -322,7 +322,7 @@ where F: Fn(A) -&gt; Option&lt;B&gt; {
     {
         match self {
             Either::Right(a) =&gt; Either::Right(a),
-            Either::Left(_) =&gt; b(),
+            Either::Left(_) =&gt; b(), // Retry!
         }
     }
     
@@ -338,11 +338,11 @@ where F: Fn(A) -&gt; Option&lt;B&gt; {
 <p><em>Note: In Rust, handling different error types <code>E</code> and <code>EE</code> usually requires <code>From</code> or a common Error trait.</em></p>
 <h3 id="exercise-47-sequence-and-traverse-for-either"><a class="header" href="#exercise-47-sequence-and-traverse-for-either">Exercise 4.7: Sequence and Traverse for Either</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">pub enum Either&lt;E, A&gt; { Left(E), Right(A) }
-</span>pub fn sequence_either&lt;E, A&gt;(es: Vec&lt;Either&lt;E, A&gt;&gt;) -&gt; Either&lt;E, Vec&lt;A&gt;&gt; {
-    traverse_either(es, |x| x)
+</span>pub fn sequence_execution&lt;E, A&gt;(es: Vec&lt;Either&lt;E, A&gt;&gt;) -&gt; Either&lt;E, Vec&lt;A&gt;&gt; {
+    traverse_execution(es, |x| x)
 }
 
-pub fn traverse_either&lt;E, A, B, F&gt;(as_vec: Vec&lt;A&gt;, f: F) -&gt; Either&lt;E, Vec&lt;B&gt;&gt;
+pub fn traverse_execution&lt;E, A, B, F&gt;(as_vec: Vec&lt;A&gt;, f: F) -&gt; Either&lt;E, Vec&lt;B&gt;&gt;
 where F: Fn(A) -&gt; Either&lt;E, B&gt; {
     let mut res = Vec::new();
     for a in as_vec {
@@ -354,10 +354,10 @@ where F: Fn(A) -&gt; Either&lt;E, B&gt; {
     Either::Right(res)
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-48-accumulating-errors"><a class="header" href="#exercise-48-accumulating-errors">Exercise 4.8: Accumulating Errors</a></h3>
-<p>To report <em>both</em> errors in <code>mkPerson</code> (name and age invalid), we would need a data structure that can hold multiple errors, like <code>Validation&lt;Vec&lt;E&gt;, A&gt;</code>. <code>Either</code> stops at the first error (fail-fast).</p>
+<h3 id="exercise-48-accumulating-errors-validation"><a class="header" href="#exercise-48-accumulating-errors-validation">Exercise 4.8: Accumulating Errors (Validation)</a></h3>
+<p>To report <em>both</em> "Model Refusal" AND "Context Limit Exceeded", we would need a data structure that can hold multiple errors, like <code>Validation&lt;Vec&lt;E&gt;, A&gt;</code>. <code>Either</code> stops at the first error (fail-fast).</p>
 <h2 id="45-summary"><a class="header" href="#45-summary">4.5 Summary</a></h2>
-<p>We learned to handle errors as values using <code>Option</code> and <code>Either</code>.</p>
+<p>We learned to handle Agent failures and hallucinations as values using <code>Option</code> and <code>Either</code>.</p>
 <h2 id="46-references"><a class="header" href="#46-references">4.6 References</a></h2>
 <ul>
 <li><strong>Error Handling</strong>: <a href="https://doc.rust-lang.org/book/ch09-00-error-handling.html">The Rust Book Ch 9</a></li>

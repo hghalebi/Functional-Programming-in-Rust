@@ -173,40 +173,40 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-15-stream-processing-and-incremental-io"><a class="header" href="#chapter-15-stream-processing-and-incremental-io">Chapter 15: Stream Processing and Incremental I/O</a></h1>
-<p>The final step in our journey is to handle I/O incrementally. We want to process data (like lines in a large file) without loading everything into memory (like <code>List</code> or <code>Vec</code>), but still retain the composability of <code>map</code>, <code>filter</code>, and <code>fold</code>.</p>
-<h2 id="151-the-problem-with-io"><a class="header" href="#151-the-problem-with-io">15.1 The Problem with I/O</a></h2>
-<p>Standard imperative I/O mixes the <em>what</em> (logic) with the <em>how</em> (looping, reading).
-Standard functional <code>List</code> separates them but requires loading all data into memory first.</p>
-<h2 id="152-the-process-algebra"><a class="header" href="#152-the-process-algebra">15.2 The Process Algebra</a></h2>
-<p>We define <code>Process&lt;I, O&gt;</code> as a state machine that can:</p>
+                        <h1 id="chapter-15-streaming-pipelines"><a class="header" href="#chapter-15-streaming-pipelines">Chapter 15: Streaming Pipelines</a></h1>
+<p>The final step in our journey is to handle I/O incrementally. We want to process data (like streams of tokens from an LLM) without loading everything into memory, but still retain the composability of <code>map</code>, <code>filter</code>, and <code>fold</code>.</p>
+<h2 id="151-the-problem-with-llm-streams"><a class="header" href="#151-the-problem-with-llm-streams">15.1 The Problem with LLM Streams</a></h2>
+<p>Standard imperative loops mix the <em>logic</em> (what to detect) with the <em>mechanics</em> (how to buffer tokens).
+Standard functional <code>List</code> requires waiting for the full response (high latency).</p>
+<h2 id="152-the-pipeline-algebra"><a class="header" href="#152-the-pipeline-algebra">15.2 The Pipeline Algebra</a></h2>
+<p>We define <code>Pipeline&lt;I, O&gt;</code> as a state machine that can:</p>
 <ol>
-<li><strong>Emit</strong> a value of type <code>O</code> and transition to a new state.</li>
-<li><strong>Await</strong> a value of type <code>I</code> and transition to a new state.</li>
+<li><strong>YieldEvent</strong> a value of type <code>O</code>.</li>
+<li><strong>AwaitInput</strong> of type <code>I</code>.</li>
 <li><strong>Halt</strong>.</li>
 </ol>
-<pre><pre class="playground"><code class="language-rust">pub enum Process&lt;I, O&gt; {
-    Emit(O, Box&lt;Process&lt;I, O&gt;&gt;),
-    Await(Box&lt;dyn FnOnce(Option&lt;I&gt;) -&gt; Process&lt;I, O&gt;&gt;),
+<pre><pre class="playground"><code class="language-rust">pub enum Pipeline&lt;I, O&gt; {
+    YieldEvent(O, Box&lt;Pipeline&lt;I, O&gt;&gt;),
+    AwaitInput(Box&lt;dyn FnOnce(Option&lt;I&gt;) -&gt; Pipeline&lt;I, O&gt;&gt;),
     Halt,
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>This is a <strong>Pull-based</strong> stream. The driver calls the process; if the process is <code>Emit</code>ting, the driver collects the value. If the process is <code>Await</code>ing, the driver fetches inputs (e.g., from a file) and feeds them in.</p>
+<p>This is a <strong>Pull-based</strong> stream. The driver calls the pipeline; if it yields, we show the token. If it awaits, we fetch the next token from the API.</p>
 <h2 id="153-composition-the-pipe-"><a class="header" href="#153-composition-the-pipe-">15.3 Composition: The Pipe (<code>|&gt;</code>)</a></h2>
-<p>The true power comes from <code>pipe</code>. We can feed the output of one process into the input of another.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">enum Process&lt;I, O&gt; { Emit(O, Box&lt;Process&lt;I, O&gt;&gt;), Await(Box&lt;dyn FnOnce(Option&lt;I&gt;) -&gt; Process&lt;I, O&gt;&gt;), Halt }
-</span><span class="boring">impl&lt;I, O&gt; Process&lt;I, O&gt; {
-</span><span class="boring">    fn filter&lt;F&gt;(_: F) -&gt; Process&lt;I, I&gt; where F: Fn(&amp;I) -&gt; bool { Process::Halt }
-</span><span class="boring">    fn lift&lt;F&gt;(_: F) -&gt; Process&lt;I, O&gt; where F: Fn(I) -&gt; O { Process::Halt }
-</span><span class="boring">    fn pipe&lt;O2&gt;(self, _: Process&lt;O, O2&gt;) -&gt; Process&lt;I, O2&gt; { Process::Halt }
+<p>The true power comes from <code>pipe</code>. We can feed the output of one pipeline (e.g. <code>Tokenizer</code>) into the input of another (e.g. <code>StopSequenceDetector</code>).</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">enum Pipeline&lt;I, O&gt; { YieldEvent(O, Box&lt;Pipeline&lt;I, O&gt;&gt;), AwaitInput(Box&lt;dyn FnOnce(Option&lt;I&gt;) -&gt; Pipeline&lt;I, O&gt;&gt;), Halt }
+</span><span class="boring">impl&lt;I, O&gt; Pipeline&lt;I, O&gt; {
+</span><span class="boring">    fn filter&lt;F&gt;(_: F) -&gt; Pipeline&lt;I, I&gt; where F: Fn(&amp;I) -&gt; bool { Pipeline::Halt }
+</span><span class="boring">    fn lift&lt;F&gt;(_: F) -&gt; Pipeline&lt;I, O&gt; where F: Fn(I) -&gt; O { Pipeline::Halt }
+</span><span class="boring">    fn pipe&lt;O2&gt;(self, _: Pipeline&lt;O, O2&gt;) -&gt; Pipeline&lt;I, O2&gt; { Pipeline::Halt }
 </span><span class="boring">}
-</span>let p1 = Process::&lt;i32, i32&gt;::filter(|x| x % 2 == 0); // Producers/Transducers
-let p2 = Process::&lt;i32, i32&gt;::lift(|x: i32| x * 10);
-let pipeline = p1.pipe(p2); // Fused Process
+</span>let p1 = Pipeline::&lt;i32, i32&gt;::filter(|token_id| *token_id != 0); // Filter padding
+let p2 = Pipeline::&lt;i32, i32&gt;::lift(|x| x); // Pass through
+let pipeline = p1.pipe(p2); // Fused Pipeline
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>The <code>pipe</code> implementation fuses the two machines into one. It runs <code>p2</code> until <code>p2</code> awaits input, then run <code>p1</code> to produce that input. This ensures <strong>constant memory usage</strong> (processing one element at a time) for arbitrary pipelines.</p>
+<p>The <code>pipe</code> implementation fuses the two machines into one. It ensures <strong>constant memory usage</strong> (processing one token at a time).</p>
 <h2 id="154-conclusion"><a class="header" href="#154-conclusion">15.4 Conclusion</a></h2>
-<p>This architecture (often called <strong>Iteratees</strong>, <strong>Transducers</strong>, or <strong>Pull Streams</strong>) is the foundation of modern functional streaming libraries like <code>fs2</code> (Scala) or <code>futures::Stream</code> (Rust). It allows us to process infinite streams or massive files with the same elegance as operating on small lists.</p>
+<p>This architecture is the foundation of modern Agentic streaming libraries. It allows us to process infinite streams of reasoning or massive context contexts with elegance.</p>
 
                     </main>
 

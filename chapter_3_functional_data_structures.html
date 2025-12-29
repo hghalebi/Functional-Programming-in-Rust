@@ -173,11 +173,12 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-3-functional-data-structures"><a class="header" href="#chapter-3-functional-data-structures">Chapter 3: Functional data structures</a></h1>
-<p>In this chapter, we’ll learn the concept of functional data structures and how to work with them. We’ll use this as an opportunity to introduce how data types are defined in functional programming, learn about the related technique of pattern matching, and get practice writing and generalizing pure functions.</p>
+                        <h1 id="chapter-3-context-windows-functional-data-structures"><a class="header" href="#chapter-3-context-windows-functional-data-structures">Chapter 3: Context Windows (Functional Data Structures)</a></h1>
+<p>In this chapter, we’ll learn the concept of functional data structures and how to work with them. In the world of Large Language Models (LLMs), managing the <strong>Context Window</strong> is critical. We often need efficient ways to manage conversation history, truncate old messages, or summarize dialogue without copying massive amounts of text.</p>
+<p>We’ll use this as an opportunity to introduce how data types are defined in functional programming, learn about the related technique of pattern matching, and get practice writing and generalizing pure functions.</p>
 <h2 id="31-defining-functional-data-structures"><a class="header" href="#31-defining-functional-data-structures">3.1 Defining functional data structures</a></h2>
-<p>A functional data structure is operated on using only pure functions. Functional data structures are by definition immutable.</p>
-<p>In Rust, the most ubiquitous functional data structure, the singly linked list, can be defined using an <code>enum</code>. To enable <strong>data sharing</strong> (persistence) as described in functional literature, we use <code>Rc</code> (Reference Counting) instead of <code>Box</code> (unique ownership). This allows multiple lists to share the same tail segments.</p>
+<p>A functional data structure is operated on using only pure functions. Functional data structures are by definition immutable. This is perfect for maintaining a <strong>Message History</strong> where we might want to fork a conversation (branching paths) without copying the entire shared history.</p>
+<p>In Rust, the most ubiquitous functional data structure, the singly linked list, can be defined using an <code>enum</code>. To enable <strong>data sharing</strong> (persistence) as described in functional literature, we use <code>Rc</code> (Reference Counting) instead of <code>Box</code> (unique ownership). This allows multiple conversation branches to share the same tail segments.</p>
 <pre><pre class="playground"><code class="language-rust">use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -194,41 +195,42 @@ impl&lt;A&gt; Default for List&lt;A&gt; {
     }
 }
 <span class="boring">fn main() {
-</span><span class="boring">    let list: List&lt;i32&gt; = List::Cons(1, Rc::new(List::Nil));
-</span><span class="boring">    println!("{:?}", list);
+</span><span class="boring">    let history: List&lt;&amp;str&gt; = List::Cons("User: Hello", Rc::new(List::Nil));
+</span><span class="boring">    println!("{:?}", history);
 </span><span class="boring">}</span></code></pre></pre>
-<p>Let’s look at the definition. <code>enum List</code> has two variants: <code>Nil</code> (empty) and <code>Cons</code> (non-empty). <code>Cons</code> holds a value of type <code>A</code> and a reference-counted pointer <code>Rc</code> to the rest of the list.</p>
+<p>Let’s look at the definition. <code>enum List</code> has two variants: <code>Nil</code> (empty) and <code>Cons</code> (non-empty). <code>Cons</code> holds a value of type <code>A</code> (a Message) and a reference-counted pointer <code>Rc</code> to the rest of the list (Previous history).</p>
 <h3 id="data-sharing"><a class="header" href="#data-sharing">Data Sharing</a></h3>
-<p>When we add an element <code>1</code> to the front of an existing list <code>xs</code>, we return a new list <code>Cons(1, Rc::new(xs))</code>. We don't copy <code>xs</code>; we just reuse it. This is called data sharing. Functional data structures are <strong>persistent</strong>, meaning existing references are never changed by operations.</p>
+<p>When we add a new message to the history, we return a new list <code>Cons(msg, Rc::new(history))</code>. We don't copy the old history; we just reuse it. This is called data sharing. Functional data structures are <strong>persistent</strong>, meaning existing references (older snapshots of the context) are never changed by operations.</p>
 <h2 id="32-pattern-matching"><a class="header" href="#32-pattern-matching">3.2 Pattern matching</a></h2>
 <p>Rust supports pattern matching via <code>match</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
 </span><span class="boring">use self::List::*;
-</span>pub fn sum(ints: &amp;List&lt;i32&gt;) -&gt; i32 {
-    match ints {
+</span>pub fn total_tokens(messages: &amp;List&lt;i32&gt;) -&gt; i32 {
+    match messages {
         Nil =&gt; 0,
-        Cons(x, xs) =&gt; x + sum(xs),
+        Cons(tokens, rest) =&gt; tokens + total_tokens(rest),
     }
 }
 
-pub fn product(ds: &amp;List&lt;f64&gt;) -&gt; f64 {
-    match ds {
+pub fn product_probabilities(probs: &amp;List&lt;f64&gt;) -&gt; f64 {
+    match probs {
         Nil =&gt; 1.0,
-        Cons(0.0, _) =&gt; 0.0,
-        Cons(x, xs) =&gt; x * product(xs),
+        Cons(0.0, _) =&gt; 0.0, // Short-circuit if probability is 0
+        Cons(p, rest) =&gt; p * product_probabilities(rest),
     }
 }
 <span class="boring">fn main() {
-</span><span class="boring">    let list = Cons(1, Rc::new(Cons(2, Rc::new(Nil))));
-</span><span class="boring">    assert_eq!(sum(&amp;list), 3);
+</span><span class="boring">    let history = Cons(100, Rc::new(Cons(200, Rc::new(Nil))));
+</span><span class="boring">    assert_eq!(total_tokens(&amp;history), 300);
 </span><span class="boring">}</span></code></pre></pre>
 <h3 id="exercise-31"><a class="header" href="#exercise-31">Exercise 3.1</a></h3>
 <p>What will be the result of the match expression?
-<em>Answer: The match expression in the book (translated to Rust syntax) would match the third case <code>x + y</code>, resulting in 3 (1 + 2).</em></p>
+<em>Answer: The match expression in the book (translated to Rust syntax) would match the third case <code>x + y</code>, resulting in 3.</em></p>
 <h2 id="33-data-sharing-in-functional-data-structures"><a class="header" href="#33-data-sharing-in-functional-data-structures">3.3 Data sharing in functional data structures</a></h2>
-<h3 id="exercise-32-tail"><a class="header" href="#exercise-32-tail">Exercise 3.2: Tail</a></h3>
-<p>Implement the function <code>tail</code> for removing the first element of a List. Note that the function takes constant time.</p>
+<h3 id="exercise-32-tail-trim-oldest"><a class="header" href="#exercise-32-tail-trim-oldest">Exercise 3.2: Tail (Trim Oldest)</a></h3>
+<p>Implement the function <code>tail</code> for removing the first element ("trimming the most recent message" if defined as cons-stack, or "oldest" if defined as queue). In a List, <code>Cons</code> adds to the front. So <code>tail</code> removes the most recent addition.
+<em>Note: In an immutable list, accessing the "rest" is O(1).</em></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
 </span><span class="boring">use self::List::*;
@@ -243,24 +245,23 @@ pub fn product(ds: &amp;List&lt;f64&gt;) -&gt; f64 {
 </span><span class="boring">   assert!(tail(&amp;list).is_some());
 </span><span class="boring">}</span></code></pre></pre>
 <p><em>Note: In Rust, returning a reference to the tail <code>&amp;Rc</code> works if we borrow the input. To return an owned persistent list, we would return <code>Rc&lt;List&lt;A&gt;&gt;</code> by cloning the pointer (cheap).</em></p>
-<h3 id="exercise-33-set-head"><a class="header" href="#exercise-33-set-head">Exercise 3.3: Set Head</a></h3>
-<p>Implement <code>set_head</code>.</p>
+<h3 id="exercise-33-set-head-replace-most-recent-message"><a class="header" href="#exercise-33-set-head-replace-most-recent-message">Exercise 3.3: Set Head (Replace Most Recent Message)</a></h3>
+<p>Implement <code>set_head</code>. Useful for "Regenerating" the last response.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Debug)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
 </span><span class="boring">use self::List::*;
 </span>pub fn set_head&lt;A&gt;(l: &amp;List&lt;A&gt;, h: A) -&gt; List&lt;A&gt; 
 where A: Clone {
     match l {
-        Nil =&gt; panic!("set_head on empty list"), // Or return Result
+        Nil =&gt; panic!("set_head on empty history"), // Or return Result
         Cons(_, xs) =&gt; Cons(h, xs.clone()),
     }
 }
 <span class="boring">fn main() {
 </span><span class="boring">   let list = Cons(1, Rc::new(Nil));
 </span><span class="boring">   let new_list = set_head(&amp;list, 2);
-</span><span class="boring">   // println!("{:?}", new_list); 
 </span><span class="boring">}</span></code></pre></pre>
-<h3 id="exercise-34-drop"><a class="header" href="#exercise-34-drop">Exercise 3.4: Drop</a></h3>
+<h3 id="exercise-34-drop-truncate-n-messages"><a class="header" href="#exercise-34-drop-truncate-n-messages">Exercise 3.4: Drop (Truncate N messages)</a></h3>
 <p>Generalize <code>tail</code> to <code>drop</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
@@ -275,7 +276,8 @@ where A: Clone {
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-35-dropwhile"><a class="header" href="#exercise-35-dropwhile">Exercise 3.5: DropWhile</a></h3>
+<h3 id="exercise-35-dropwhile-truncate-until-condition"><a class="header" href="#exercise-35-dropwhile-truncate-until-condition">Exercise 3.5: DropWhile (Truncate until condition)</a></h3>
+<p>Useful for "Remove messages until System Prompt".</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
 </span><span class="boring">use self::List::*;
@@ -287,9 +289,9 @@ where F: Fn(&amp;A) -&gt; bool {
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-36-init"><a class="header" href="#exercise-36-init">Exercise 3.6: Init</a></h3>
-<p>Implement a function <code>init</code> that returns a List consisting of all but the last element.
-<em>Why can't this be constant time? Because we must rebuild the path to the new end.</em></p>
+<h3 id="exercise-36-init-remove-oldest-message"><a class="header" href="#exercise-36-init-remove-oldest-message">Exercise 3.6: Init (Remove oldest message)</a></h3>
+<p>Implement a function <code>init</code> that returns a List consisting of all but the last element (the oldest message).
+<em>Why can't this be constant time? Because in a singly linked list <code>Cons(A, Rest)</code>, the end is far away. We must rebuild the path.</em></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
 </span><span class="boring">use self::List::*;
@@ -302,17 +304,19 @@ where F: Fn(&amp;A) -&gt; bool {
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="34-recursion-over-lists-and-generalizing-to-higher-order-functions"><a class="header" href="#34-recursion-over-lists-and-generalizing-to-higher-order-functions">3.4 Recursion over lists and generalizing to higher-order functions</a></h2>
-<h3 id="exercise-37---315-folds"><a class="header" href="#exercise-37---315-folds">Exercise 3.7 - 3.15: Folds</a></h3>
-<p><strong>Exercise 3.9: Length using fold_right</strong></p>
+<h3 id="exercise-37---315-folds-context-summarization"><a class="header" href="#exercise-37---315-folds-context-summarization">Exercise 3.7 - 3.15: Folds (Context Summarization)</a></h3>
+<p>Folding is the essence of <strong>Summarization</strong>. You take a list of messages and reduce them to a single value (a Summary).</p>
+<p><strong>Exercise 3.9: Length (Message Count)</strong></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Clone)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
 </span><span class="boring">use self::List::*;
 </span><span class="boring">fn fold_right&lt;A, B, F&gt;(l: &amp;List&lt;A&gt;, z: B, f: F) -&gt; B where F: Fn(&amp;A, B) -&gt; B + Clone { match l { Nil =&gt; z, Cons(h, t) =&gt; f(h, fold_right(t, z, f.clone())) } } 
-</span>pub fn length&lt;A&gt;(l: &amp;List&lt;A&gt;) -&gt; usize {
+</span>pub fn count_messages&lt;A&gt;(l: &amp;List&lt;A&gt;) -&gt; usize {
     fold_right(l, 0, |_, acc| acc + 1)
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p><strong>Exercise 3.10: Fold Left (Tail recursive)</strong></p>
+<p><strong>Exercise 3.10: Fold Left (Iterative Summarization)</strong>
+Ideal for large context windows to avoid stack overflow.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Clone)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
 </span><span class="boring">use self::List::*;
@@ -324,7 +328,8 @@ where F: Fn(B, &amp;A) -&gt; B {
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p><strong>Exercise 3.12: Reverse</strong></p>
+<p><strong>Exercise 3.12: Reverse (Chronological Sorting)</strong>
+Linked Lists are usually built in reverse order (stack). To get chronological order for the LLM, we reverse.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Clone)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
 </span><span class="boring">use self::List::*;
@@ -333,44 +338,45 @@ where F: Fn(B, &amp;A) -&gt; B {
     fold_left(l, Nil, |acc, h| Cons(h.clone(), Rc::new(acc)))
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h2 id="35-trees"><a class="header" href="#35-trees">3.5 Trees</a></h2>
-<p>Algebraic data types can be used to define other data structures.</p>
+<h2 id="35-conversation-trees"><a class="header" href="#35-conversation-trees">3.5 Conversation Trees</a></h2>
+<p>Algebraic data types can be used to define other data structures. A <strong>Conversation Tree</strong> represents branching dialogue paths.</p>
 <pre><pre class="playground"><code class="language-rust">pub enum Tree&lt;A&gt; {
     Leaf(A),
     Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;),
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
 <p><em>Note: For Trees, <code>Box</code> (unique ownership) is often sufficient unless we need DAGs or explicit sharing.</em></p>
-<h3 id="exercise-325-size"><a class="header" href="#exercise-325-size">Exercise 3.25: Size</a></h3>
+<h3 id="exercise-325-size-total-turns"><a class="header" href="#exercise-325-size-total-turns">Exercise 3.25: Size (Total Turns)</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">enum Tree&lt;A&gt; { Leaf(A), Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;) }
-</span>pub fn size&lt;A&gt;(t: &amp;Tree&lt;A&gt;) -&gt; usize {
+</span>pub fn count_turns&lt;A&gt;(t: &amp;Tree&lt;A&gt;) -&gt; usize {
     match t {
         Tree::Leaf(_) =&gt; 1,
-        Tree::Branch(l, r) =&gt; 1 + size(l) + size(r),
+        Tree::Branch(l, r) =&gt; 1 + count_turns(l) + count_turns(r),
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-326-maximum"><a class="header" href="#exercise-326-maximum">Exercise 3.26: Maximum</a></h3>
+<h3 id="exercise-326-maximum-max-token-count"><a class="header" href="#exercise-326-maximum-max-token-count">Exercise 3.26: Maximum (Max Token Count)</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">enum Tree&lt;A&gt; { Leaf(A), Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;) }
-</span>pub fn maximum(t: &amp;Tree&lt;i32&gt;) -&gt; i32 {
+</span>pub fn max_token_usage(t: &amp;Tree&lt;i32&gt;) -&gt; i32 {
     match t {
         Tree::Leaf(v) =&gt; *v,
-        Tree::Branch(l, r) =&gt; maximum(l).max(maximum(r)),
+        Tree::Branch(l, r) =&gt; max_token_usage(l).max(max_token_usage(r)),
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-328-map"><a class="header" href="#exercise-328-map">Exercise 3.28: Map</a></h3>
+<h3 id="exercise-328-map-sanitize-messages"><a class="header" href="#exercise-328-map-sanitize-messages">Exercise 3.28: Map (Sanitize Messages)</a></h3>
+<p>Apply a function (e.g., PII Redaction) to every node.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">enum Tree&lt;A&gt; { Leaf(A), Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;) }
-</span>pub fn map&lt;A, B, F&gt;(t: &amp;Tree&lt;A&gt;, f: &amp;F) -&gt; Tree&lt;B&gt;
+</span>pub fn map_conversation&lt;A, B, F&gt;(t: &amp;Tree&lt;A&gt;, f: &amp;F) -&gt; Tree&lt;B&gt;
 where F: Fn(&amp;A) -&gt; B {
     match t {
         Tree::Leaf(v) =&gt; Tree::Leaf(f(v)),
-        Tree::Branch(l, r) =&gt; Tree::Branch(Box::new(map(l, f)), Box::new(map(r, f))),
+        Tree::Branch(l, r) =&gt; Tree::Branch(Box::new(map_conversation(l, f)), Box::new(map_conversation(r, f))),
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="36-summary"><a class="header" href="#36-summary">3.6 Summary</a></h2>
-<p>We introduced algebraic data types (ADTs), <code>List</code> and <code>Tree</code>, and higher-order functions like <code>map</code>, <code>fold</code>, and <code>filter</code>.</p>
+<p>We introduced algebraic data types (ADTs), <code>List</code> (Message History) and <code>Tree</code> (Conversation Branches), and higher-order functions like <code>map</code>, <code>fold</code> (Summarize), and <code>filter</code>.</p>
 <h2 id="37-references"><a class="header" href="#37-references">3.7 References</a></h2>
 <ul>
 <li><strong>Rust Book Ch 6 (Enums)</strong>: <a href="https://doc.rust-lang.org/book/ch06-00-enums.html">The Rust Programming Language</a></li>

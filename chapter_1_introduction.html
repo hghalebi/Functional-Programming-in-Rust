@@ -183,184 +183,182 @@
 <li>Printing to the console or reading user input</li>
 <li>Reading from or writing to a file</li>
 <li>Drawing on the screen</li>
+<li><strong>Calling an external API (like an LLM or Database)</strong></li>
 </ul>
-<p>We’ll provide a more precise definition of side effects later in this chapter, but consider what programming would be like without the ability to do these things, or with significant restrictions on when and how these actions can occur. It may be difficult to imagine. How is it even possible to write useful programs at all? If we can’t reassign variables, how do we write simple programs like loops? What about working with data that changes, or handling errors without throwing exceptions? How can we write programs that must perform I/O, like drawing to the screen or reading from a file?</p>
-<p>The answer is that functional programming is a restriction on how we write programs, but not on what programs we can express. Over the course of this book, we’ll learn how to express all of our programs without side effects, and that includes programs that perform I/O, handle errors, and modify data. We’ll learn how following the discipline of FP is tremendously beneficial because of the increase in modularity that we gain from programming with pure functions. Because of their modularity, pure functions are easier to test, reuse, parallelize, generalize, and reason about. Furthermore, pure functions are much less prone to bugs.</p>
+<p>We’ll provide a more precise definition of side effects later in this chapter, but consider what programming would be like without the ability to do these things. It may be difficult to imagine. How is it even possible to write useful Agentic workflows at all? If we can't call APIs or update memory, how do our Agents do anything?</p>
+<p>The answer is that functional programming is a restriction on <em>how</em> we write programs, but not on <em>what</em> programs we can express. Over the course of this book, we’ll learn how to express all of our Agentic workflows without side effects, and that includes programs that perform I/O, handle errors, and manage context. We’ll learn how following the discipline of FP is tremendously beneficial because of the increase in modularity that we gain from programming with pure functions (which we can think of as <strong>Deterministic Tools</strong>). Because of their modularity, these tools are easier to test, reuse, parallelize, generalize, and reason about. Furthermore, pure functions are much less prone to bugs (or hallucinations in logic).</p>
 <p>In this chapter, we’ll look at a simple program with side effects and demonstrate some of the benefits of FP by removing these side effects. We’ll also discuss the benefits of FP more generally and define two important concepts—referential transparency and the substitution model.</p>
 <h2 id="11-the-benefits-of-fp-a-simple-example"><a class="header" href="#11-the-benefits-of-fp-a-simple-example">1.1 The benefits of FP: a simple example</a></h2>
 <p>Let’s look at an example that demonstrates some of the benefits of programming with pure functions. The point here is just to illustrate some basic ideas that we’ll return to throughout this book. This will also be your first exposure to Rust's syntax if you are new to the language.</p>
 <h3 id="111-a-program-with-side-effects"><a class="header" href="#111-a-program-with-side-effects">1.1.1 A program with side effects</a></h3>
-<p>Suppose we’re implementing a program to handle purchases at a coffee shop. We’ll begin with a Rust program that uses side effects in its implementation (also called an impure program).</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] struct Coffee { price: f64 }
-</span><span class="boring">impl Coffee { fn new() -&gt; Self { Coffee { price: 2.5 } } }
-</span><span class="boring">struct CreditCard;
-</span><span class="boring">impl CreditCard { fn charge(&amp;mut self, _price: f64) {} }
-</span>struct Cafe;
+<p>Suppose we’re implementing a client to interact with an Large Language Model (LLM). We want to generate text completions and bill our users for the tokens they consume. We’ll begin with a Rust program that uses side effects in its implementation (also called an impure program).</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] struct Completion { tokens: i32 }
+</span><span class="boring">impl Completion { fn new() -&gt; Self { Completion { tokens: 100 } } }
+</span><span class="boring">struct BillingService;
+</span><span class="boring">impl BillingService { fn charge_usage(&amp;mut self, _tokens: i32) {} }
+</span>struct LLMClient;
 
-impl Cafe {
-    fn buy_coffee(&amp;self, cc: &amp;mut CreditCard) -&gt; Coffee {
-        let cup = Coffee::new();
-        cc.charge(cup.price);
-        cup
+impl LLMClient {
+    fn generate_completion(&amp;self, billing: &amp;mut BillingService) -&gt; Completion {
+        let response = Completion::new();
+        billing.charge_usage(response.tokens);
+        response
     }
 }
 <span class="boring">fn main() {
-</span><span class="boring">    let cafe = Cafe;
-</span><span class="boring">    let mut cc = CreditCard;
-</span><span class="boring">    let _ = cafe.buy_coffee(&amp;mut cc);
+</span><span class="boring">    let client = LLMClient;
+</span><span class="boring">    let mut billing = BillingService;
+</span><span class="boring">    let _ = client.generate_completion(&amp;mut billing);
 </span><span class="boring">}</span></code></pre></pre>
-<p>The line <code>cc.charge(cup.price)</code> is an example of a side effect. Charging a credit card involves some interaction with the outside world—suppose it requires contacting the credit card company via some web service, authorizing the transaction, charging the card, and (if successful) persisting some record of the transaction for later reference.</p>
-<p>But our function merely returns a <code>Coffee</code> and these other actions are happening on the side, hence the term “side effect.”</p>
-<p>As a result of this side effect, the code is difficult to test. We don’t want our tests to actually contact the credit card company and charge the card! This lack of testability is suggesting a design change: arguably, <code>CreditCard</code> shouldn’t have any knowledge baked into it about how to contact the credit card company to actually execute a charge, nor should it have knowledge of how to persist a record of this charge in our internal systems. We can make the code more modular and testable by letting <code>CreditCard</code> be ignorant of these concerns and passing a <code>Payments</code> object into <code>buy_coffee</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] struct Coffee { price: f64 }
-</span><span class="boring">impl Coffee { fn new() -&gt; Self { Coffee { price: 2.5 } } }
-</span><span class="boring">struct CreditCard;
-</span><span class="boring">trait Payments { fn charge(&amp;mut self, cc: &amp;mut CreditCard, amount: f64); }
-</span><span class="boring">struct MockPayments;
-</span><span class="boring">impl Payments for MockPayments { fn charge(&amp;mut self, _cc: &amp;mut CreditCard, _amount: f64) {} }
-</span>struct Cafe;
+<p>The line <code>billing.charge_usage(response.tokens)</code> is an example of a side effect. Charging for usage involves interaction with the outside world—suppose it requires contacting a database, updating a distributed quota system, or calling an external payment provider like Stripe.</p>
+<p>But our function merely returns a <code>Completion</code> (the text response) and these other actions are happening on the side, hence the term “side effect.”</p>
+<p>As a result of this side effect, the code is difficult to test. We don’t want our unit tests to actually contact the billing system and charge real money! This lack of testability is suggesting a design change: arguably, <code>LLMClient</code> shouldn’t have any knowledge baked into it about how to contact the billing system, nor should it have knowledge of how to persist transaction records. We can make the code more modular and testable by letting <code>LLMClient</code> be ignorant of these concerns and passing a <code>Billing</code> object into <code>generate_completion</code>.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] struct Completion { tokens: i32 }
+</span><span class="boring">impl Completion { fn new() -&gt; Self { Completion { tokens: 100 } } }
+</span><span class="boring">struct BillingService;
+</span><span class="boring">trait Billing { fn charge_usage(&amp;mut self, tokens: i32); }
+</span><span class="boring">struct MockBilling;
+</span><span class="boring">impl Billing for MockBilling { fn charge_usage(&amp;mut self, _tokens: i32) {} }
+</span>struct LLMClient;
 
-impl Cafe {
-    fn buy_coffee(&amp;self, cc: &amp;mut CreditCard, p: &amp;mut dyn Payments) -&gt; Coffee {
-        let cup = Coffee::new();
-        p.charge(cc, cup.price);
-        cup
+impl LLMClient {
+    fn generate_completion(&amp;self, billing: &amp;mut dyn Billing) -&gt; Completion {
+        let response = Completion::new();
+        billing.charge_usage(response.tokens);
+        response
     }
 }
 <span class="boring">fn main() {
-</span><span class="boring">    let cafe = Cafe;
-</span><span class="boring">    let mut cc = CreditCard;
-</span><span class="boring">    let mut p = MockPayments;
-</span><span class="boring">    let _ = cafe.buy_coffee(&amp;mut cc, &amp;mut p);
+</span><span class="boring">    let client = LLMClient;
+</span><span class="boring">    let mut mock = MockBilling;
+</span><span class="boring">    let _ = client.generate_completion(&amp;mut mock);
 </span><span class="boring">}</span></code></pre></pre>
-<p>Though side effects still occur when we call <code>p.charge(cc, cup.price)</code>, we have at least regained some testability. <code>Payments</code> can be a trait (interface), and we can write a mock implementation of this trait that is suitable for testing. But that isn’t ideal either. We’re forced to make <code>Payments</code> a trait, when a concrete struct may have been fine otherwise, and any mock implementation will be awkward to use. For example, it might contain some internal state that we’ll have to inspect after the call to <code>buy_coffee</code>, and our test will have to make sure this state has been appropriately modified (mutated) by the call to <code>charge</code>.</p>
-<p>Separate from the concern of testing, there’s another problem: it’s difficult to reuse <code>buy_coffee</code>. Suppose a customer, Alice, would like to order 12 cups of coffee. Ideally we could just reuse <code>buy_coffee</code> for this, perhaps calling it 12 times in a loop. But as it is currently implemented, that will involve contacting the payment system 12 times, authorizing 12 separate charges to Alice’s credit card! That adds more processing fees and isn’t good for Alice or the coffee shop.</p>
+<p>Though side effects still occur when we call <code>billing.charge_usage</code>, we have at least regained some testability. <code>Billing</code> can be a trait (interface), and we can write a mock implementation of this trait that is suitable for testing. But that isn’t ideal either. We’re forced to make <code>Billing</code> a trait, when a concrete struct may have been fine otherwise, and any mock implementation will be awkward to use. For example, it might contain some internal state that we’ll have to inspect after the call to <code>generate_completion</code>, and our test will have to make sure this state has been appropriately modified (mutated) by the call.</p>
+<p>Separate from the concern of testing, there’s another problem: it’s difficult to reuse <code>generate_completion</code>. Suppose we want to implement a "Chain of Thought" workflow where we generate 12 intermediate reasoning steps. Ideally we could just reuse <code>generate_completion</code> for this, perhaps calling it 12 times in a loop. But as it is currently implemented, that will involve contacting the billing system 12 times! That adds significant latency and load to our billing infrastructure.</p>
 <h3 id="112-a-functional-solution-removing-the-side-effects"><a class="header" href="#112-a-functional-solution-removing-the-side-effects">1.1.2 A functional solution: removing the side effects</a></h3>
-<p>The functional solution is to eliminate side effects and have <code>buy_coffee</code> return the charge as a value in addition to returning the <code>Coffee</code>. The concerns of processing the charge by sending it off to the credit card company, persisting a record of it, and so on, will be handled elsewhere.</p>
+<p>The functional solution is to eliminate side effects and have <code>generate_completion</code> return the usage cost as a value in addition to returning the <code>Completion</code>. The concerns of processing the cost by checking quotas, persisting records, and so on, will be handled elsewhere.</p>
 <p>Here’s what a functional solution might look like in Rust:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone)] struct CreditCard;
-</span><span class="boring">#[derive(Clone, Copy)] struct Coffee { price: f64 }
-</span><span class="boring">impl Coffee { fn new() -&gt; Self { Coffee { price: 2.5 } } }
-</span><span class="boring">struct Charge { cc: CreditCard, amount: f64 }
-</span><span class="boring">impl Charge { fn new(cc: CreditCard, amount: f64) -&gt; Self { Charge { cc, amount } } }
-</span>struct Cafe;
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone)] struct AccountId;
+</span><span class="boring">#[derive(Clone, Copy)] struct Completion { tokens: i32 }
+</span><span class="boring">impl Completion { fn new() -&gt; Self { Completion { tokens: 100 } } }
+</span><span class="boring">struct TokenUsage { account: AccountId, tokens: i32 }
+</span><span class="boring">impl TokenUsage { fn new(account: AccountId, tokens: i32) -&gt; Self { TokenUsage { account, tokens } } }
+</span>struct LLMClient;
 
-impl Cafe {
-    fn buy_coffee(&amp;self, cc: &amp;CreditCard) -&gt; (Coffee, Charge) {
-        let cup = Coffee::new();
-        (cup, Charge::new(cc.clone(), cup.price))
+impl LLMClient {
+    fn generate_completion(&amp;self, account: &amp;AccountId) -&gt; (Completion, TokenUsage) {
+        let response = Completion::new();
+        (response, TokenUsage::new(account.clone(), response.tokens))
     }
 }
 <span class="boring">fn main() {
-</span><span class="boring">    let cafe = Cafe;
-</span><span class="boring">    let cc = CreditCard;
-</span><span class="boring">    let _ = cafe.buy_coffee(&amp;cc);
+</span><span class="boring">    let client = LLMClient;
+</span><span class="boring">    let account = AccountId;
+</span><span class="boring">    let _ = client.generate_completion(&amp;account);
 </span><span class="boring">}</span></code></pre></pre>
-<p>Here we’ve separated the concern of creating a charge from the processing or interpretation of that charge. The <code>buy_coffee</code> function now returns a <code>Charge</code> as a value along with the <code>Coffee</code>. We’ll see shortly how this lets us reuse it more easily to purchase multiple coffees with a single transaction. But what is <code>Charge</code>? It’s a data type we just invented containing a <code>CreditCard</code> and an amount, equipped with a handy function, <code>combine</code>, for combining charges with the same <code>CreditCard</code>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(PartialEq, Clone)] struct CreditCard;
-</span>struct Charge {
-    cc: CreditCard,
-    amount: f64,
+<p>Here we’ve separated the concern of <em>creating</em> a usage record from the <em>processing</em> of that record. The <code>generate_completion</code> function now returns a <code>TokenUsage</code> as a value along with the <code>Completion</code>. We’ll see shortly how this lets us reuse it more easily to generate multiple completions with a single transaction. But what is <code>TokenUsage</code>? It’s a data type we just invented containing an <code>AccountId</code> and an amount, equipped with a handy function, <code>combine</code>, for combining usage logs for the same Account:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(PartialEq, Clone)] struct AccountId;
+</span>struct TokenUsage {
+    account: AccountId,
+    tokens: i32,
 }
 
-impl Charge {
-    fn combine(&amp;self, other: &amp;Charge) -&gt; Result&lt;Charge, String&gt; {
-        if self.cc == other.cc {
-            Ok(Charge {
-                cc: self.cc.clone(),
-                amount: self.amount + other.amount,
+impl TokenUsage {
+    fn combine(&amp;self, other: &amp;TokenUsage) -&gt; Result&lt;TokenUsage, String&gt; {
+        if self.account == other.account {
+            Ok(TokenUsage {
+                account: self.account.clone(),
+                tokens: self.tokens + other.tokens,
             })
         } else {
-            Err("Can't combine charges to different cards".to_string())
+            Err("Can't combine usage for different accounts".to_string())
         }
     }
 }
 <span class="boring">fn main() {
-</span><span class="boring">   let cc = CreditCard;
-</span><span class="boring">   let c1 = Charge { cc: cc.clone(), amount: 2.0 };
-</span><span class="boring">   let c2 = Charge { cc, amount: 3.0 };
-</span><span class="boring">   assert!(c1.combine(&amp;c2).is_ok());
+</span><span class="boring">   let acc = AccountId;
+</span><span class="boring">   let u1 = TokenUsage { account: acc.clone(), tokens: 50 };
+</span><span class="boring">   let u2 = TokenUsage { account: acc, tokens: 150 };
+</span><span class="boring">   assert!(u1.combine(&amp;u2).is_ok());
 </span><span class="boring">}</span></code></pre></pre>
-<p>Now let’s look at <code>buy_coffees</code>, to implement the purchase of <code>n</code> cups of coffee. Unlike before, this can now be implemented in terms of <code>buy_coffee</code>, as we had hoped.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(PartialEq, Clone)] struct CreditCard;
-</span><span class="boring">#[derive(Clone, Copy)] struct Coffee { price: f64 }
-</span><span class="boring">impl Coffee { fn new() -&gt; Self { Coffee { price: 2.5 } } }
-</span><span class="boring">#[derive(Clone)] struct Charge { cc: CreditCard, amount: f64 }
-</span><span class="boring">impl Charge { 
-</span><span class="boring">   fn new(cc: CreditCard, amount: f64) -&gt; Self { Charge { cc, amount } } 
-</span><span class="boring">   fn combine(&amp;self, other: &amp;Charge) -&gt; Result&lt;Charge, String&gt; { Ok(Charge { cc: self.cc.clone(), amount: self.amount + other.amount }) }
+<p>Now let’s look at <code>batch_generate</code>, to implement the generation of <code>n</code> completions. Unlike before, this can now be implemented in terms of <code>generate_completion</code>, as we had hoped.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(PartialEq, Clone)] struct AccountId;
+</span><span class="boring">#[derive(Clone, Copy)] struct Completion { tokens: i32 }
+</span><span class="boring">impl Completion { fn new() -&gt; Self { Completion { tokens: 100 } } }
+</span><span class="boring">#[derive(Clone)] struct TokenUsage { account: AccountId, tokens: i32 }
+</span><span class="boring">impl TokenUsage { 
+</span><span class="boring">   fn new(account: AccountId, tokens: i32) -&gt; Self { TokenUsage { account, tokens } } 
+</span><span class="boring">   fn combine(&amp;self, other: &amp;TokenUsage) -&gt; Result&lt;TokenUsage, String&gt; { Ok(TokenUsage { account: self.account.clone(), tokens: self.tokens + other.tokens }) }
 </span><span class="boring">}
-</span><span class="boring">struct Cafe;
-</span>impl Cafe {
-<span class="boring">  fn buy_coffee(&amp;self, cc: &amp;CreditCard) -&gt; (Coffee, Charge) { (Coffee::new(), Charge::new(cc.clone(), 2.5)) }
-</span>    fn buy_coffees(&amp;self, cc: &amp;CreditCard, n: usize) -&gt; (Vec&lt;Coffee&gt;, Charge) {
-        let purchases: Vec&lt;(Coffee, Charge)&gt; = (0..n)
-            .map(|_| self.buy_coffee(cc))
+</span><span class="boring">struct LLMClient;
+</span>impl LLMClient {
+<span class="boring">  fn generate_completion(&amp;self, account: &amp;AccountId) -&gt; (Completion, TokenUsage) { (Completion::new(), TokenUsage::new(account.clone(), 100)) }
+</span>    fn batch_generate(&amp;self, account: &amp;AccountId, n: usize) -&gt; (Vec&lt;Completion&gt;, TokenUsage) {
+        let results: Vec&lt;(Completion, TokenUsage)&gt; = (0..n)
+            .map(|_| self.generate_completion(account))
             .collect();
         
-        let (coffees, charges): (Vec&lt;Coffee&gt;, Vec&lt;Charge&gt;) = purchases.into_iter().unzip();
+        let (completions, usages): (Vec&lt;Completion&gt;, Vec&lt;TokenUsage&gt;) = results.into_iter().unzip();
         
-        let combined_charge = charges.into_iter()
-            .reduce(|c1, c2| c1.combine(&amp;c2).unwrap())
-            .unwrap_or(Charge::new(cc.clone(), 0.0)); // Handle 0 coffees case
+        let total_usage = usages.into_iter()
+            .reduce(|u1, u2| u1.combine(&amp;u2).unwrap())
+            .unwrap_or(TokenUsage::new(account.clone(), 0));
             
-        (coffees, combined_charge)
+        (completions, total_usage)
     }
 }
 <span class="boring">fn main() {
-</span><span class="boring">    let cafe = Cafe;
-</span><span class="boring">    let cc = CreditCard;
-</span><span class="boring">    let (_, charge) = cafe.buy_coffees(&amp;cc, 12);
-</span><span class="boring">    assert_eq!(charge.amount, 30.0);
+</span><span class="boring">    let client = LLMClient;
+</span><span class="boring">    let acc = AccountId;
+</span><span class="boring">    let (_, usage) = client.batch_generate(&amp;acc, 12);
+</span><span class="boring">    assert_eq!(usage.tokens, 1200);
 </span><span class="boring">}</span></code></pre></pre>
-<p>Overall, this solution is a marked improvement—we’re now able to reuse <code>buy_coffee</code> directly to define the <code>buy_coffees</code> function, and both functions are trivially testable without having to define complicated mock implementations of some <code>Payments</code> interface!</p>
-<p>Making <code>Charge</code> into a first-class value has other benefits we might not have anticipated: we can more easily assemble business logic for working with these charges. For instance, Alice may bring her laptop to the coffee shop and work there for a few hours, making occasional purchases. It might be nice if the coffee shop could combine these purchases Alice makes into a single charge, again saving on credit card processing fees. Since <code>Charge</code> is first-class, we can write the following function to coalesce any same-card charges in a <code>Vec&lt;Charge&gt;</code>:</p>
+<p>Overall, this solution is a marked improvement—we’re now able to reuse <code>generate_completion</code> directly to define the <code>batch_generate</code> function, and both functions are trivially testable without having to define complicated mock implementations of some <code>Billing</code> interface!</p>
+<p>Making <code>TokenUsage</code> into a first-class value has other benefits we might not have anticipated: we can more easily assemble business logic for working with these usage logs. For instance, an Agent might run a complex multi-step workflow involving creating documents, researching, and coding. It might be nice if we could combine all the usage across these different tools into a single billable event. Since <code>TokenUsage</code> is first-class, we can write the following function to coalesce any same-account usage in a <code>Vec&lt;TokenUsage&gt;</code>:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::collections::HashMap;
-</span><span class="boring">#[derive(PartialEq, Eq, Clone, Hash)] struct CreditCard;
-</span><span class="boring">#[derive(Clone)] struct Charge { cc: CreditCard, amount: f64 }
-</span><span class="boring">impl Charge { fn combine(&amp;self, other: &amp;Charge) -&gt; Result&lt;Charge, String&gt; { Ok(Charge { cc: self.cc.clone(), amount: self.amount + other.amount }) } }
-</span>
-fn coalesce(charges: Vec&lt;Charge&gt;) -&gt; Vec&lt;Charge&gt; {
+</span><span class="boring">#[derive(PartialEq, Eq, Clone, Hash)] struct AccountId;
+</span><span class="boring">#[derive(Clone)] struct TokenUsage { account: AccountId, tokens: i32 }
+</span><span class="boring">impl TokenUsage { fn combine(&amp;self, other: &amp;TokenUsage) -&gt; Result&lt;TokenUsage, String&gt; { Ok(TokenUsage { account: self.account.clone(), tokens: self.tokens + other.tokens }) } }
+</span> 
+fn coalesce_usage(logs: Vec&lt;TokenUsage&gt;) -&gt; Vec&lt;TokenUsage&gt; {
     // In a real Rust app, we might use itertools using a HashMap or sort first
     // Since we don't have itertools in pure std, we can implement it simply.
-    // For brevity, let's assume we have a way to group by card:
     
-    let mut groups: HashMap&lt;CreditCard, Vec&lt;Charge&gt;&gt; = HashMap::new();
-    for charge in charges {
-        groups.entry(charge.cc.clone()).or_default().push(charge);
+    let mut groups: HashMap&lt;AccountId, Vec&lt;TokenUsage&gt;&gt; = HashMap::new();
+    for log in logs {
+        groups.entry(log.account.clone()).or_default().push(log);
     }
     
     groups.values()
-        .map(|list| list.iter().cloned().reduce(|c1, c2| c1.combine(&amp;c2).unwrap()).unwrap())
+        .map(|list| list.iter().cloned().reduce(|u1, u2| u1.combine(&amp;u2).unwrap()).unwrap())
         .collect()
 }
 <span class="boring">fn main() {
-</span><span class="boring">   let cc = CreditCard;
-</span><span class="boring">   let charges = vec![Charge { cc: cc.clone(), amount: 1.0 }, Charge { cc, amount: 2.0 }];
-</span><span class="boring">   let coalesced = coalesce(charges);
-</span><span class="boring">   assert_eq!(coalesced.len(), 1);
-</span><span class="boring">   assert_eq!(coalesced[0].amount, 3.0);
+</span><span class="boring">   let acc = AccountId;
+</span><span class="boring">   let logs = vec![TokenUsage { account: acc.clone(), tokens: 10 }, TokenUsage { account: acc, tokens: 20 }];
+</span><span class="boring">   let summary = coalesce_usage(logs);
+</span><span class="boring">   assert_eq!(summary[0].tokens, 30);
 </span><span class="boring">}</span></code></pre></pre>
-<p>This sort of transformation can be applied to any function with side effects to push these effects to the outer layers of the program. Functional programmers often speak of implementing programs with a pure core and a thin layer on the outside that handles effects.</p>
+<p>This sort of transformation can be applied to any function with side effects to push these effects to the outer layers of the program. Functional programmers often speak of implementing programs with a pure core and a thin layer on the outside that handles effects (I/O).</p>
 <h2 id="12-exactly-what-is-a-pure-function"><a class="header" href="#12-exactly-what-is-a-pure-function">1.2 Exactly what is a (pure) function?</a></h2>
-<p>We said earlier that FP means programming with pure functions, and a pure function is one that lacks side effects. In our discussion of the coffee shop example, we worked off an informal notion of side effects and purity. Here we’ll formalize this notion, to pinpoint more precisely what it means to program functionally.</p>
+<p>We said earlier that FP means programming with pure functions, and a pure function is one that lacks side effects. In our discussion of the LLM example, we worked off an informal notion of side effects and purity. Here we’ll formalize this notion, to pinpoint more precisely what it means to program functionally (or "Agentically").</p>
 <p>A function <code>f</code> with input type <code>A</code> and output type <code>B</code> (written in Rust as <code>fn(A) -&gt; B</code>) is a computation that relates every value <code>a</code> of type <code>A</code> to exactly one value <code>b</code> of type <code>B</code> such that <code>b</code> is determined solely by the value of <code>a</code>. Any changing state of an internal or external process is irrelevant to computing the result <code>f(a)</code>. For example, a function <code>int_to_string</code> having type <code>fn(i32) -&gt; String</code> will take every integer to a corresponding string. Furthermore, if it really is a function, it will do nothing else.</p>
-<p>In other words, a function has no observable effect on the execution of the program other than to compute a result given its inputs; we say that it has no side effects.</p>
+<p>In other words, a function (or <strong>Deterministic Tool</strong>) has no observable effect on the execution of the program other than to compute a result given its inputs; we say that it has no side effects.</p>
 <p>We can formalize this idea of pure functions using the concept of <strong>referential transparency (RT)</strong>. This is a property of expressions in general and not just functions. For the purposes of our discussion, consider an expression to be any part of a program that can be evaluated to a result. For example, <code>2 + 3</code> is an expression that applies the pure function <code>+</code> to the values <code>2</code> and <code>3</code>. This has no side effect. The evaluation of this expression results in the same value <code>5</code> every time. In fact, if we saw <code>2 + 3</code> in a program we could simply replace it with the value <code>5</code> and it wouldn’t change a thing about the meaning of our program.</p>
 <p>This is all it means for an expression to be referentially transparent—in any program, the expression can be replaced by its result without changing the meaning of the program. And we say that a function is pure if calling it with RT arguments is also RT.</p>
 <h2 id="13-referential-transparency-purity-and-the-substitution-model"><a class="header" href="#13-referential-transparency-purity-and-the-substitution-model">1.3 Referential transparency, purity, and the substitution model</a></h2>
-<p>Let’s see how the definition of RT applies to our original <code>buy_coffee</code> example:</p>
-<pre><code class="language-rust ignore">fn buy_coffee(&amp;self, cc: &amp;mut CreditCard) -&gt; Coffee {
-    let cup = Coffee::new();
-    cc.charge(cup.price);
-    cup
+<p>Let’s see how the definition of RT applies to our original <code>generate_completion</code> example:</p>
+<pre><code class="language-rust ignore">fn generate_completion(&amp;self, billing: &amp;mut BillingService) -&gt; Completion {
+    let response = Completion::new();
+    billing.charge_usage(response.tokens);
+    response
 }</code></pre>
-<p>Whatever the return type of <code>cc.charge(cup.price)</code> (perhaps it’s <code>()</code> unit), it’s discarded by <code>buy_coffee</code>. Thus, the result of evaluating <code>buy_coffee(alice_credit_card)</code> will be merely <code>cup</code>, which is equivalent to a <code>Coffee::new()</code>. For <code>buy_coffee</code> to be pure, by our definition of RT, it must be the case that <code>p(buy_coffee(alice_credit_card))</code> behaves the same as <code>p(Coffee::new())</code>, for any <code>p</code>.</p>
-<p>This clearly doesn’t hold—the program <code>Coffee::new()</code> doesn’t do anything, whereas <code>buy_coffee(alice_credit_card)</code> will contact the credit card company and authorize a charge. Already we have an observable difference between the two programs.</p>
+<p>Whatever the return type of <code>billing.charge_usage(...)</code> (perhaps it’s <code>()</code> unit), it’s discarded by <code>generate_completion</code>. Thus, the result of evaluating <code>generate_completion(my_account)</code> will be merely <code>response</code>. For <code>generate_completion</code> to be pure, by our definition of RT, it must be the case that <code>p(generate_completion(my_account))</code> behaves the same as <code>p(Completion::new())</code>, for any <code>p</code>.</p>
+<p>This clearly doesn’t hold—the program <code>Completion::new()</code> doesn’t do anything, whereas <code>generate_completion(my_account)</code> will contact the billing system and charge real money. Already we have an observable difference between the two programs.</p>
 <p>Referential transparency forces the invariant that everything a function does is represented by the value that it returns, according to the result type of the function. This constraint enables a simple and natural mode of reasoning about program evaluation called the <strong>substitution model</strong>. When expressions are referentially transparent, we can imagine that computation proceeds much like we’d solve an algebraic equation. We fully expand every part of an expression, replacing all variables with their referents, and then reduce it to its simplest form. At each step we replace a term with an equivalent one; computation proceeds by substituting equals for equals. In other words, RT enables equational reasoning about programs.</p>
 <h2 id="14-summary"><a class="header" href="#14-summary">1.4 Summary</a></h2>
 <p>In this chapter, we introduced functional programming and explained exactly what FP is and why you might use it. We illustrated some of the benefits of FP using a simple example. We also discussed referential transparency and the substitution model and talked about how FP enables simpler reasoning about programs and greater modularity.</p>
-<p>In this book, you’ll learn the concepts and principles of FP as they apply to every level of programming, starting from the simplest of tasks and building on that foundation.</p>
+<p>In this book, you’ll learn the concepts and principles of FP as they apply to every level of Agentic programming, starting from the simplest of tasks and building on that foundation.</p>
 <h2 id="15-references"><a class="header" href="#15-references">1.5 References</a></h2>
 <ul>
 <li><strong>Rust Book Ch 1 (Introduction)</strong>: <a href="https://doc.rust-lang.org/book/ch01-00-getting-started.html">The Rust Programming Language</a></li>

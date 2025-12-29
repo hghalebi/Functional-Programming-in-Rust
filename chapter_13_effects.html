@@ -173,72 +173,67 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-13-external-effects-and-io"><a class="header" href="#chapter-13-external-effects-and-io">Chapter 13: External Effects and I/O</a></h1>
-<p>This chapter explores how to handle "external effects" (like reading files, printing to console, or network calls) in a purely functional way. The core idea is to separate the <strong>description</strong> of the computation from its <strong>execution</strong>.</p>
+                        <h1 id="chapter-13-tool-use-external-io"><a class="header" href="#chapter-13-tool-use-external-io">Chapter 13: Tool Use (External I/O)</a></h1>
+<p>This chapter explores how to handle <strong>External Tools</strong> (like reading files, searching the web, or calling APIs) in a purely functional way. The core idea is to separate the <strong>description</strong> of the tool call (<code>ToolAction</code>) from its <strong>execution</strong>.</p>
 <blockquote>
 <p>[!NOTE]
-In idiomatic Rust, I/O is typically handled imperatively with <code>std::io</code> or asynchronously with <code>Future</code> (which is monad-like!). This chapter explores the <em>pure functional modeling</em> of I/O, which powers the design of async runtimes.</p>
+In idiomatic Rust, I/O is typically handled imperatively with <code>std::io</code> or asynchronously with <code>Future</code>. This chapter explores the <em>pure functional modeling</em> of Tool Use, which powers the design of Agent Runtimes.</p>
 </blockquote>
-<h2 id="131-the-io-type"><a class="header" href="#131-the-io-type">13.1 The IO Type</a></h2>
-<p>We can model an effectful computation as a value that, when "run", performs the effect. In its simplest form, this is just a wrapper around a function (a thunk).</p>
-<pre><pre class="playground"><code class="language-rust">pub struct SimpleIO&lt;A&gt;(Box&lt;dyn FnOnce() -&gt; A&gt;);
+<h2 id="131-the-toolaction-type"><a class="header" href="#131-the-toolaction-type">13.1 The ToolAction Type</a></h2>
+<p>We can model an effectful tool call as a value that, when "run", performs the effect.</p>
+<pre><pre class="playground"><code class="language-rust">pub struct ToolAction&lt;A&gt;(Box&lt;dyn FnOnce() -&gt; A&gt;);
 
-impl&lt;A: 'static&gt; SimpleIO&lt;A&gt; {
+impl&lt;A: 'static&gt; ToolAction&lt;A&gt; {
     pub fn new&lt;F&gt;(f: F) -&gt; Self where F: FnOnce() -&gt; A + 'static { 
-        SimpleIO(Box::new(f)) 
+        ToolAction(Box::new(f)) 
     }
     
-    pub fn run(self) -&gt; A { (self.0)() }
+    pub fn execute(self) -&gt; A { (self.0)() }
     
-    pub fn flat_map&lt;B: 'static, F&gt;(self, f: F) -&gt; SimpleIO&lt;B&gt;
-    where F: FnOnce(A) -&gt; SimpleIO&lt;B&gt; + 'static
+    pub fn then_act&lt;B: 'static, F&gt;(self, f: F) -&gt; ToolAction&lt;B&gt;
+    where F: FnOnce(A) -&gt; ToolAction&lt;B&gt; + 'static
     {
-        SimpleIO::new(move || f(self.run()).run())
+        ToolAction::new(move || f(self.execute()).execute())
     }
 }
 <span class="boring">fn main() {
-</span><span class="boring">    let io = SimpleIO::new(|| 42);
-</span><span class="boring">    assert_eq!(io.run(), 42);
+</span><span class="boring">    let action = ToolAction::new(|| 42);
+</span><span class="boring">    assert_eq!(action.execute(), 42);
 </span><span class="boring">}</span></code></pre></pre>
 <h2 id="132-composition"><a class="header" href="#132-composition">13.2 Composition</a></h2>
-<p>Since <code>IO</code> is a description, we can compose these descriptions. <code>IO</code> forms a Monad.</p>
+<p>Since <code>ToolAction</code> is a description, we can compose these descriptions. <code>ToolAction</code> forms a Monad.</p>
 <ul>
-<li><strong><code>map</code></strong>: Transform the result of an effect description.</li>
-<li><strong><code>flatMap</code></strong>: Chain effects, where the second effect depends on the result of the first.</li>
+<li><strong><code>map</code></strong>: Transform the result (e.g., parse tool output).</li>
+<li><strong><code>then_act</code> (flat_map)</strong>: Chain tools, where the second tool depends on the result of the first.</li>
 </ul>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">struct SimpleIO&lt;A&gt;(Box&lt;dyn FnOnce() -&gt; A&gt;);
-</span><span class="boring">impl&lt;A: 'static&gt; SimpleIO&lt;A&gt; {
-</span><span class="boring">    fn new&lt;F&gt;(f: F) -&gt; Self where F: FnOnce() -&gt; A + 'static { SimpleIO(Box::new(f)) }
-</span><span class="boring">    fn run(self) -&gt; A { (self.0)() }
-</span><span class="boring">    fn flat_map&lt;B: 'static, F&gt;(self, f: F) -&gt; SimpleIO&lt;B&gt; where F: FnOnce(A) -&gt; SimpleIO&lt;B&gt; + 'static {
-</span><span class="boring">        SimpleIO::new(move || f((self.0)()).run())
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct ToolAction&lt;A&gt;(Box&lt;dyn FnOnce() -&gt; A&gt;);
+</span><span class="boring">impl&lt;A: 'static&gt; ToolAction&lt;A&gt; {
+</span><span class="boring">    fn new&lt;F&gt;(f: F) -&gt; Self where F: FnOnce() -&gt; A + 'static { ToolAction(Box::new(f)) }
+</span><span class="boring">    fn execute(self) -&gt; A { (self.0)() }
+</span><span class="boring">    fn then_act&lt;B: 'static, F&gt;(self, f: F) -&gt; ToolAction&lt;B&gt; where F: FnOnce(A) -&gt; ToolAction&lt;B&gt; + 'static {
+</span><span class="boring">        ToolAction::new(move || f((self.0)()).execute())
 </span><span class="boring">    }
 </span><span class="boring">}
-</span>struct Console;
-impl Console {
-    fn read_line() -&gt; SimpleIO&lt;String&gt; { SimpleIO::new(|| "Bob".to_string()) }
-    fn print_line(_: &amp;str) -&gt; SimpleIO&lt;()&gt; { SimpleIO::new(|| ()) }
+</span>struct Terminal;
+impl Terminal {
+    fn read_user_input() -&gt; ToolAction&lt;String&gt; { ToolAction::new(|| "User query".to_string()) }
+    fn emit_log(msg: &amp;str) -&gt; ToolAction&lt;()&gt; { ToolAction::new(|| ()) }
 }
 
-let program = Console::read_line()
-    .flat_map(|name| Console::print_line(&amp;format!("Hello, {}!", name)));
+let agent_loop = Terminal::read_user_input()
+    .then_act(|query| Terminal::emit_log(&amp;format!("Processing: {}", query)));
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>Until we call <code>program.run()</code>, nothing happens. This is <strong>Referential Transparency</strong>: the expression <code>program</code> can be replaced by its definition without changing the outcome (because the outcome <em>is just a description</em>, not the side effect itself).</p>
+<p>Until we call <code>agent_loop.execute()</code>, nothing happens. This is <strong>Referential Transparency</strong>: the expression <code>agent_loop</code> can be replaced by its definition without changing the outcome (because the outcome <em>is just a description</em>, not the side effect itself).</p>
 <h2 id="133-limitations-and-the-free-monad"><a class="header" href="#133-limitations-and-the-free-monad">13.3 Limitations and The Free Monad</a></h2>
-<p>Our simple <code>IO</code> type has a flaw: it uses the Rust call stack for <code>flatMap</code>. Deeply recursive programs (like an infinite event loop) will cause a <code>StackOverflowError</code>.</p>
-<p>In Scala (and advanced Rust), we solve this using <strong>Trampolining</strong> or the <strong>Free Monad</strong>. This involves reifying the control flow (<code>FlatMap</code>, <code>Return</code>) as data structures rather than function calls. The interpreter then runs in a loop (a trampoline), keeping the stack constant.</p>
-<p>Implementing a full generic <code>Free</code> monad in Rust is complex due to the lack of Higher-Kinded Types (HKT) and challenges with type erasure in <code>FlatMap</code>. Ideally, one would use a crate like <code>stacker</code> or specialized enum structures, but the conceptual model remains the same: <strong>Data as Control Flow</strong>.</p>
+<p>Our simple <code>ToolAction</code> uses the Rust call stack. Deeply recursive loops (infinite agents) will overflow.
+We solve this using <strong>Trampolining</strong> or the <strong>Free Monad</strong> (Data as Control Flow).</p>
 <h2 id="134-use-cases"><a class="header" href="#134-use-cases">13.4 Use Cases</a></h2>
 <p>This pattern allows us to:</p>
 <ol>
-<li><strong>Test Effectful Code</strong>: We can inspect the description (if we use the <code>Free</code> enum approach) or swap interpreters.</li>
-<li><strong>Safe Refactoring</strong>: We can refactor effectful sequences with the same confidence as pure logic.</li>
-<li><strong>Custom Interpreters</strong>: We could run an <code>IO</code> program asynchronously, or log every step, just by changing the <code>run</code> function.</li>
+<li><strong>Test Agents</strong>: We can swap the "Interpreter" to mock tools without changing the Agent's logic.</li>
+<li><strong>Safe Refactoring</strong>: We can refactor effectful sequences with confidence.</li>
+<li><strong>Audit Logs</strong>: We can inspect the <code>ToolAction</code> before running it to ensure safety/alignment.</li>
 </ol>
-<blockquote>
-<p>[!TIP]
-Rust's <code>async</code>/<code>await</code> syntax effectively builds a state machine (a form of Free Monad or Coroutine) that the Executor (like <code>tokio</code>) interprets. Understanding <code>IO</code> monads clarifies how <code>async</code> works under the hood!</p>
-</blockquote>
 
                     </main>
 

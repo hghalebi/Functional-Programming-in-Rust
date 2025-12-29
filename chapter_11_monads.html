@@ -173,15 +173,12 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-11-monads"><a class="header" href="#chapter-11-monads">Chapter 11: Monads</a></h1>
-<p>In this chapter, we generalize the patterns we've seen in <code>Gen</code>, <code>Parser</code>, <code>Option</code>, and <code>State</code>. We identify two key abstractions: the <strong>Functor</strong> and the <strong>Monad</strong>.</p>
-<h2 id="111-functors"><a class="header" href="#111-functors">11.1 Functors</a></h2>
-<p>A Functor is a type constructor <code>F</code> that provides a <code>map</code> function. In Scala, this is represented as <code>trait Functor[F[_]]</code>. In Rust, we lack native support for Higher-Kinded Types (HKTs) (i.e., types that take other types as type arguments, like <code>Option</code> itself, not <code>Option&lt;i32&gt;</code>).</p>
-<p>To work around this, we use <strong>Generic Associated Types (GATs)</strong>, a feature stabilized in Rust 1.65. We define a trait that has an associated type <code>Wrapped&lt;A&gt;</code> representing <code>F&lt;A&gt;</code>.</p>
-<blockquote>
-<p>[!NOTE]
-Learn more about GATs in the <a href="https://blog.rust-lang.org/2022/10/28/gats-stabilization.html">Official Rust Blog Post</a>.</p>
-</blockquote>
+                        <h1 id="chapter-11-chains-of-thought-monads"><a class="header" href="#chapter-11-chains-of-thought-monads">Chapter 11: Chains of Thought (Monads)</a></h1>
+<p>In this chapter, we generalize the patterns we've seen in <code>TestCaseGenerator</code> (Gen), <code>Extractor</code> (Parser), <code>Option</code>, and <code>Agent</code> (State). We identify two key abstractions for Agentic Flow Control: the <strong>Functor</strong> (Mapping) and the <strong>Monad</strong> (Chaining).</p>
+<p>In LLM engineering, the <strong>Chain of Thought</strong> (CoT) pattern is ubiquitous. An agent thinks <code>A</code>, then uses <code>A</code> to think <code>B</code>. This dependency (<code>A -&gt; B</code>) is exactly what a Monad captures.</p>
+<h2 id="111-functors-mapping-thoughts"><a class="header" href="#111-functors-mapping-thoughts">11.1 Functors (Mapping Thoughts)</a></h2>
+<p>A Functor is a type <code>F</code> that provides a <code>map</code> function. E.g., <code>Option::map</code> transforms a potential value without handling the "None" case explicitly.</p>
+<p>To work around Rust's lack of Higher-Kinded Types (HKTs), we use <strong>Generic Associated Types (GATs)</strong>.</p>
 <pre><pre class="playground"><code class="language-rust">pub trait Functor {
     type Wrapped&lt;A&gt;;
     
@@ -189,43 +186,33 @@ Learn more about GATs in the <a href="https://blog.rust-lang.org/2022/10/28/gats
     where F: Fn(A) -&gt; B;
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>This allows us to write generic code that works for any Functor, provided we implement the trait for a specific "Monad Type" (like <code>OptionMonad</code> acts as the descriptor for <code>Option</code>).</p>
-<h2 id="112-monads"><a class="header" href="#112-monads">11.2 Monads</a></h2>
-<p>The Monad abstraction adds <code>unit</code> and <code>flatMap</code> (often called <code>bind</code> or <code>&gt;&gt;=</code> in other languages).</p>
-<p>Make note that <strong>Rust's standard library</strong> uses the term <code>and_then</code> for <code>Option</code> and <code>Result</code>, and <code>flat_map</code> for <code>Iterator</code>.</p>
+<h2 id="112-monads-reasoning-chains"><a class="header" href="#112-monads-reasoning-chains">11.2 Monads (Reasoning Chains)</a></h2>
+<p>The Monad abstraction adds <code>unit</code> (Thought) and <code>flat_map</code> (Next Step).
+In Agent terms, <code>flat_map</code> allows the <em>next step</em> of the chain to be determined by the <em>result</em> of the previous step.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Functor { type Wrapped&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
 </span>pub trait Monad: Functor {
     fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;;
     
     fn flat_map&lt;A, B, F&gt;(ma: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt;
     where F: Fn(A) -&gt; Self::Wrapped&lt;B&gt;;
-    
-    // ... map2 ...
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="the-map2-challenge-in-rust"><a class="header" href="#the-map2-challenge-in-rust">The <code>map2</code> Challenge in Rust</a></h3>
-<p>In functional theory, <code>map2</code> can be derived from <code>flatMap</code> and <code>map</code>. However, in Rust, implementing <code>map2</code> generically via <code>flatMap</code> involves closures.</p>
-<pre><code class="language-rust ignore">// Conceptual default implementation
-flat_map(ma, |a| map(mb, |b| f(a, b)))</code></pre>
-<p>This inner closure <code>|b| f(a, b)</code> captures <code>a</code> and <code>f</code>. If the Monad executes this closure multiple times (like <code>Vec</code>/List monad, which handles non-determinism), <code>f</code> and <code>a</code> must be clonable. Because of this complexity in a generic context, we essentially require <code>map2</code> to be implemented (or specialized) by the instance, or we impose <code>Clone</code> bounds on the function <code>F</code> and the values.</p>
 <h2 id="113-instances"><a class="header" href="#113-instances">11.3 Instances</a></h2>
-<p>We implemented Monad instances for:</p>
+<p>We can implement Monad instances for:</p>
 <ul>
-<li><strong>Option</strong>: Simple sequencing. Failure short-circuits. Equivalent to <code>Option::and_then</code>.</li>
-<li><strong>Vec (List)</strong>: Represents non-determinism. <code>flatMap</code> applies the function to each element and concatenates the results. Equivalent to <code>Iterator::flat_map</code>.</li>
-<li><strong>Id</strong>: The identity monad, wrapping a value directly.</li>
-<li><strong>Result</strong>: Similar to Option but carries an error value. Equivalent to <code>Result::and_then</code>.</li>
+<li><strong>Option (Validation)</strong>: Simple sequencing. Failure short-circuits the reasoning chain.</li>
+<li><strong>Vec (Branching)</strong>: Represents non-determinism (Generating multiple hypotheses). <code>flat_map</code> explores all branches.</li>
+<li><strong>Id (Direct)</strong>: The identity monad.</li>
+<li><strong>Agent (State)</strong>: The "Agent Monad" from Chapter 6. <code>flat_map</code> sequences actions while passing memory.</li>
 </ul>
 <h2 id="114-combinators"><a class="header" href="#114-combinators">11.4 Combinators</a></h2>
-<p>Once we have the <code>Monad</code> trait, we can define powerful combinators that work for <em>any</em> monad:</p>
+<p>Once we have the <code>Monad</code> trait, we can define powerful combinators that work for <em>any</em> reasoning chain:</p>
 <ul>
-<li><strong><code>sequence</code></strong>: Turns a <code>Vec&lt;M&lt;A&gt;&gt;</code> into <code>M&lt;Vec&lt;A&gt;&gt;</code>.</li>
-<li><strong><code>traverse</code></strong>: Maps a function <code>A -&gt; M&lt;B&gt;</code> over a list and collects the results.</li>
-<li><strong><code>replicateM</code></strong>: Generates a list of <code>n</code> values from sequencing a monad.</li>
-<li><strong><code>filterM</code></strong>: A powerful combinator that filters a list based on a monadic predicate. For <code>Vec</code> (List Monad), this generates the powerset (all subsequences) of a list!</li>
+<li><strong><code>sequence</code></strong>: Turns a list of steps <code>Vec&lt;Step&lt;A&gt;&gt;</code> into a single Step yielding a list <code>Step&lt;Vec&lt;A&gt;&gt;</code>.</li>
+<li><strong><code>filterM</code></strong>: Filters a list based on a reasoning predicate (e.g. "Keep only relevant documents").</li>
 </ul>
 <h2 id="115-conclusion"><a class="header" href="#115-conclusion">11.5 Conclusion</a></h2>
-<p>Monads provide a unified interface for sequencing operations. Despite Rust's type system differences from Scala (lack of HKTs), we can effectively model these concepts using GATs, allowing us to write reusable, generic control flow logic.</p>
+<p>Monads provide a unified interface for sequencing operations. They are the mathematical foundation of "Chain of Thought" prompting.</p>
 <h2 id="116-references"><a class="header" href="#116-references">11.6 References</a></h2>
 <ul>
 <li><strong>Rust Blog (GATs)</strong>: <a href="https://blog.rust-lang.org/2022/10/28/gats-stabilization.html">Stabilization Announcement</a></li>

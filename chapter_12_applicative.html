@@ -173,14 +173,14 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-12-applicative-and-traversable-functors"><a class="header" href="#chapter-12-applicative-and-traversable-functors">Chapter 12: Applicative and Traversable Functors</a></h1>
-<p>In this chapter, we discover that <strong>Monad</strong> is not the only useful abstraction for effectful computation. We introduce <strong>Applicative</strong>, which is generally "weaker" than Monad (it can do less) but also more general (more things are Applicatives) and allows for different behaviors, such as parallel execution and error accumulation. We then generalize the <code>traverse</code> and <code>sequence</code> functions into the <strong>Traverse</strong> trait.</p>
-<h2 id="121-applicative-functors"><a class="header" href="#121-applicative-functors">12.1 Applicative Functors</a></h2>
-<p>A Monad is defined by <code>unit</code> and <code>flatMap</code>.
-An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>apply</code>).</p>
+                        <h1 id="chapter-12-parallel-queries-applicative-and-traversable"><a class="header" href="#chapter-12-parallel-queries-applicative-and-traversable">Chapter 12: Parallel Queries (Applicative and Traversable)</a></h1>
+<p>In this chapter, we discover that <strong>Reasoning Chain</strong> (Monad) is not the only useful abstraction for Agentic computation. We introduce <strong>Parallel Executor</strong> (Applicative), which allows for different behaviors, such as parallel tool execution and error accumulation. We then generalize the <code>traverse</code> and <code>sequence</code> functions into the <strong>Batch Executor</strong> (Traverse) trait.</p>
+<h2 id="121-parallel-executors-applicatives"><a class="header" href="#121-parallel-executors-applicatives">12.1 Parallel Executors (Applicatives)</a></h2>
+<p>A Reasoning Chain (Monad) is defined by <code>unit</code> and <code>flat_map</code> (sequential).
+A Parallel Executor (Applicative) is defined by <code>unit</code> and <code>map2</code> (parallel).</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Functor { type Wrapped&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
 </span>pub trait Applicative: Functor {
-    fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;; // Same as Monad
+    fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;;
     
     fn map2&lt;A, B, C, F&gt;(
         fa: Self::Wrapped&lt;A&gt;,
@@ -190,23 +190,22 @@ An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>a
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="why-applicative"><a class="header" href="#why-applicative">Why Applicative?</a></h3>
-<p>If we look at <code>map2</code> vs <code>flatMap</code>:</p>
+<p>If we look at <code>map2</code> vs <code>flat_map</code>:</p>
 <ul>
-<li><code>flatMap</code> allows the <em>structure</em> of the second computation to depend on the <em>result</em> of the first.</li>
-<li><code>map2</code> takes two independent computations and combines their results.</li>
+<li><code>flat_map</code> allows the <em>structure</em> of the second thought to depend on the <em>result</em> of the first. "If tool A returns X, call tool B. Else call C."</li>
+<li><code>map2</code> takes two independent tasks and combines their results. "Call tool A and tool B."</li>
 </ul>
 <p>This independence means:</p>
 <ol>
-<li><strong>Parallelism</strong>: Since <code>fa</code> and <code>fb</code> are independent, they can be computed in parallel (e.g., fetching two URLs).</li>
-<li><strong>Analysis</strong>: We can inspect the structure of the computation without running it.</li>
-<li><strong>Accumulation</strong>: We can accumulate errors from both branches (e.g., form validation), whereas <code>flatMap</code> usually stops at the first error.</li>
+<li><strong>Parallelism</strong>: Since <code>fa</code> and <code>fb</code> are independent, they can be computed in parallel.</li>
+<li><strong>Analysis</strong>: We can inspect the structure of the computation plan without running it.</li>
 </ol>
-<h2 id="122-traversable-functors"><a class="header" href="#122-traversable-functors">12.2 Traversable Functors</a></h2>
-<p>We've seen <code>traverse</code> and <code>sequence</code> for List, Option, and Map. We can abstract this into a <strong>Traverse</strong> trait.</p>
-<p>A Traversable functor allows us to iterate over a data structure (like a Tree or List) while maintaining an effect (Applicative) context.</p>
+<h2 id="122-batch-executor-traverse"><a class="header" href="#122-batch-executor-traverse">12.2 Batch Executor (Traverse)</a></h2>
+<p>We've seen <code>batch_execute</code> (traverse) for Lists and Options. We can abstract this into a <strong>Traverse</strong> trait.</p>
+<p>A Traversable functor allows us to iterate over a data structure (like a <code>ConversationTree</code>) while maintaining an effect (Parallel Execution) context.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Functor { type Wrapped&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
 </span><span class="boring">pub trait Applicative: Functor { fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;; fn map2&lt;A, B, C, F&gt;(fa: Self::Wrapped&lt;A&gt;, fb: Self::Wrapped&lt;B&gt;, f: F) -&gt; Self::Wrapped&lt;C&gt;; }
-</span>pub trait Traverse: Functor { // actually extends Functor and Foldable conceptually
+</span>pub trait Traverse: Functor {
     fn traverse&lt;G, A, B, F&gt;(
         fa: Self::Wrapped&lt;A&gt;,
         f: F
@@ -214,30 +213,8 @@ An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>a
     where G: Applicative;
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="example-tree-traversal"><a class="header" href="#example-tree-traversal">Example: Tree Traversal</a></h3>
-<p>If we have a <code>Tree&lt;i32&gt;</code> and we want to apply a function that might fail (returning <code>Option&lt;i32&gt;</code>) to every node, <code>traverse</code> will give us <code>Option&lt;Tree&lt;i32&gt;&gt;</code>. It turns the "Tree of Options" into an "Option of Tree".</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Functor { type Wrapped&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
-</span><span class="boring">pub trait Applicative: Functor { fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;; fn map2&lt;A, B, C, F&gt;(fa: Self::Wrapped&lt;A&gt;, fb: Self::Wrapped&lt;B&gt;, f: F) -&gt; Self::Wrapped&lt;C&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
-</span><span class="boring">pub trait Traverse: Functor { fn traverse&lt;G, A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; G::Wrapped&lt;Self::Wrapped&lt;B&gt;&gt; where G: Applicative, F: Fn(A) -&gt; G::Wrapped&lt;B&gt; + Clone + 'static; }
-</span><span class="boring">enum Tree&lt;A&gt; { Leaf(A), Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;) }
-</span><span class="boring">struct TreeApp;
-</span><span class="boring">impl Functor for TreeApp { type Wrapped&lt;A&gt; = Tree&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Tree&lt;A&gt;, f: F) -&gt; Tree&lt;B&gt; where F: Fn(A) -&gt; B { match fa { Tree::Leaf(a) =&gt; Tree::Leaf(f(a)), Tree::Branch(l, r) =&gt; Tree::Branch(Box::new(Self::map(*l, &amp;f)), Box::new(Self::map(*r, f))) } } } // Dummy impl
-</span>impl Traverse for TreeApp {
-    fn traverse&lt;G, A, B, F&gt;(fa: Tree&lt;A&gt;, f: F) -&gt; G::Wrapped&lt;Tree&lt;B&gt;&gt;
-    where G: Applicative, F: Fn(A) -&gt; G::Wrapped&lt;B&gt; + Clone + 'static { // Added bounds for compilation
-        match fa {
-            Tree::Leaf(a) =&gt; &lt;G as Functor&gt;::map(f(a), |b| Tree::Leaf(b)),
-            Tree::Branch(l, r) =&gt; {
-                let gl = Self::traverse::&lt;G, _, _, _&gt;(*l, f.clone());
-                let gr = Self::traverse::&lt;G, _, _, _&gt;(*r, f);
-                G::map2(gl, gr, |l: Tree&lt;B&gt;, r: Tree&lt;B&gt;| Tree::Branch(Box::new(l), Box::new(r)))
-            }
-        }
-    }
-}
-<span class="boring">fn main() {}</span></code></pre></pre>
 <h2 id="123-conclusion"><a class="header" href="#123-conclusion">12.3 Conclusion</a></h2>
-<p>Applicative and Traversable complete our tour of the core functional type classes. They allow us to write extremely generic code for data manipulation, separating the <em>mechanism</em> of the effect (Option, Result, Async) from the <em>structure</em> of the data (List, Tree, Map). In Rust, using generic traits and GATs allows us to express these powerful abstractions in a type-safe way.</p>
+<p>Applicative and Traversable allow us to separate the <em>mechanism</em> of execution (Sequential vs Parallel) from the <em>structure</em> of the data (List vs Tree).</p>
 
                     </main>
 

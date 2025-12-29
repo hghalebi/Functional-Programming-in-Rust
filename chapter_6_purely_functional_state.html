@@ -173,73 +173,78 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-6-purely-functional-state"><a class="header" href="#chapter-6-purely-functional-state">Chapter 6: Purely Functional State</a></h1>
-<p>Handling state without side effects is a core aspect of functional programming. We use the <strong>State Monad</strong> pattern, where a state transition is a function <code>S -&gt; (A, S)</code>.</p>
-<h2 id="61-generating-random-numbers-simple-rng"><a class="header" href="#61-generating-random-numbers-simple-rng">6.1 Generating random numbers (Simple RNG)</a></h2>
-<pre><pre class="playground"><code class="language-rust">pub trait RNG {
-    fn next_int(&amp;self) -&gt; (i32, Box&lt;dyn RNG&gt;);
+                        <h1 id="chapter-6-agent-memory-purely-functional-state"><a class="header" href="#chapter-6-agent-memory-purely-functional-state">Chapter 6: Agent Memory (Purely Functional State)</a></h1>
+<p>Handling state without side effects is a core aspect of Agentic programming. Agents need to manage <strong>Memory</strong> (History, Context, Variables) as they execute steps. We use the <strong>State Monad</strong> pattern, where a state transition is a function <code>Memory -&gt; (Action, Memory)</code>.</p>
+<h2 id="61-generating-random-tokens-mockllm"><a class="header" href="#61-generating-random-tokens-mockllm">6.1 Generating random tokens (MockLLM)</a></h2>
+<p>To test our Agents deterministically, we need a Mock LLM that generates "Random" tokens but in a reproducible way.</p>
+<pre><pre class="playground"><code class="language-rust">pub trait MockLLM {
+    fn next_token(&amp;self) -&gt; (i32, Box&lt;dyn MockLLM&gt;);
 }
 
 #[derive(Clone)]
-pub struct SimpleRNG {
+pub struct SimpleMockLLM {
     seed: i64,
 }
 
-impl SimpleRNG {
-    pub fn new(seed: i64) -&gt; SimpleRNG {
-        SimpleRNG { seed }
+impl SimpleMockLLM {
+    pub fn new(seed: i64) -&gt; SimpleMockLLM {
+        SimpleMockLLM { seed }
     }
 }
-<span class="boring">impl RNG for SimpleRNG {
-</span><span class="boring">    fn next_int(&amp;self) -&gt; (i32, Box&lt;dyn RNG&gt;) {
+<span class="boring">impl MockLLM for SimpleMockLLM {
+</span><span class="boring">    fn next_token(&amp;self) -&gt; (i32, Box&lt;dyn MockLLM&gt;) {
 </span><span class="boring">        let new_seed = (self.seed.wrapping_mul(0x5DEECE66D).wrapping_add(0xB)) &amp; 0xFFFFFFFFFFFF;
-</span><span class="boring">        let next_rng = SimpleRNG { seed: new_seed };
+</span><span class="boring">        let next_rng = SimpleMockLLM { seed: new_seed };
 </span><span class="boring">        let n = (new_seed &gt;&gt; 16) as i32;
 </span><span class="boring">        (n, Box::new(next_rng))
 </span><span class="boring">    }
 </span><span class="boring">}
 </span><span class="boring">fn main() {
-</span><span class="boring">    let rng = SimpleRNG::new(42);
-</span><span class="boring">    let (n1, _rng2) = rng.next_int();
-</span><span class="boring">    println!("{}", n1);
+</span><span class="boring">    let llm = SimpleMockLLM::new(42);
+</span><span class="boring">    let (token1, _next_state) = llm.next_token();
+</span><span class="boring">    println!("Generated token ID: {}", token1);
 </span><span class="boring">}</span></code></pre></pre>
-<h3 id="exercise-61-non_negative_int"><a class="header" href="#exercise-61-non_negative_int">Exercise 6.1: non_negative_int</a></h3>
-<h3 id="exercise-62-double"><a class="header" href="#exercise-62-double">Exercise 6.2: double</a></h3>
+<h3 id="exercise-61-non_negative_token"><a class="header" href="#exercise-61-non_negative_token">Exercise 6.1: non_negative_token</a></h3>
+<h3 id="exercise-62-double_precision_prob"><a class="header" href="#exercise-62-double_precision_prob">Exercise 6.2: double_precision_prob</a></h3>
 <h3 id="exercise-63-int_double-double_int-double3"><a class="header" href="#exercise-63-int_double-double_int-double3">Exercise 6.3: int_double, double_int, double3</a></h3>
-<h3 id="exercise-64-ints"><a class="header" href="#exercise-64-ints">Exercise 6.4: ints</a></h3>
+<h3 id="exercise-64-generate_token_list"><a class="header" href="#exercise-64-generate_token_list">Exercise 6.4: generate_token_list</a></h3>
 <h2 id="64-a-better-api-for-state-actions"><a class="header" href="#64-a-better-api-for-state-actions">6.4 A better API for state actions</a></h2>
-<p>We define <code>Rand&lt;A&gt;</code> as a type alias for <code>Fn(RNG) -&gt; (A, RNG)</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait RNG {}
-</span>type Rand&lt;A&gt; = Box&lt;dyn Fn(Box&lt;dyn RNG&gt;) -&gt; (A, Box&lt;dyn RNG&gt;)&gt;;
+<p>We define <code>Sampler&lt;A&gt;</code> as a type alias for <code>Fn(MockLLM) -&gt; (A, MockLLM)</code>. This represents a probabilistic action.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait MockLLM {}
+</span>type Sampler&lt;A&gt; = Box&lt;dyn Fn(Box&lt;dyn MockLLM&gt;) -&gt; (A, Box&lt;dyn MockLLM&gt;)&gt;;
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-65-double-via-map"><a class="header" href="#exercise-65-double-via-map">Exercise 6.5: double via map</a></h3>
 <h3 id="exercise-66-map2"><a class="header" href="#exercise-66-map2">Exercise 6.6: map2</a></h3>
 <h3 id="exercise-67-sequence"><a class="header" href="#exercise-67-sequence">Exercise 6.7: sequence</a></h3>
 <h3 id="exercise-68-flat_map"><a class="header" href="#exercise-68-flat_map">Exercise 6.8: flat_map</a></h3>
 <h3 id="exercise-69-map-and-map2-via-flat_map"><a class="header" href="#exercise-69-map-and-map2-via-flat_map">Exercise 6.9: map and map2 via flat_map</a></h3>
-<h2 id="65-a-general-state-generic"><a class="header" href="#65-a-general-state-generic">6.5 A general State generic</a></h2>
-<p>We generalize <code>Rand</code> to <code>State&lt;S, A&gt;</code>.</p>
-<pre><pre class="playground"><code class="language-rust">pub struct State&lt;S, A&gt;(pub Box&lt;dyn Fn(S) -&gt; (A, S)&gt;);
+<h2 id="65-a-general-agent-state-generic"><a class="header" href="#65-a-general-agent-state-generic">6.5 A general Agent State generic</a></h2>
+<p>We generalize <code>Sampler</code> to <code>Agent&lt;Memory, Action&gt;</code>. An Agent is simply a function that takes a memory state and returns an action (decision) plus the new memory state.</p>
+<pre><pre class="playground"><code class="language-rust">// Agent&lt;Memory, Action&gt;
+pub struct Agent&lt;S, A&gt;(pub Box&lt;dyn Fn(S) -&gt; (A, S)&gt;);
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-610-unit-map-map2-flat_map-sequence-for-state"><a class="header" href="#exercise-610-unit-map-map2-flat_map-sequence-for-state">Exercise 6.10: unit, map, map2, flat_map, sequence for State</a></h3>
+<h3 id="exercise-610-unit-map-map2-flat_map-sequence-for-agent"><a class="header" href="#exercise-610-unit-map-map2-flat_map-sequence-for-agent">Exercise 6.10: unit, map, map2, flat_map, sequence for Agent</a></h3>
 <h2 id="66-purely-functional-imperative-programming"><a class="header" href="#66-purely-functional-imperative-programming">6.6 Purely functional imperative programming</a></h2>
-<p>Using <code>State</code>, we can write imperative-looking code using <code>flat_map</code> chains.</p>
-<h3 id="exercise-611-candy-machine"><a class="header" href="#exercise-611-candy-machine">Exercise 6.11: Candy Machine</a></h3>
-<p>Implement a finite state automaton for a candy dispenser.</p>
+<p>Using <code>Agent</code> (State Monad), we can write imperative-looking code using <code>flat_map</code> chains to represent an Agent's Thought Process.</p>
+<h3 id="exercise-611-chatbot-state-machine"><a class="header" href="#exercise-611-chatbot-state-machine">Exercise 6.11: ChatBot State Machine</a></h3>
+<p>Implement a finite state automaton for a simple ChatBot.</p>
 <pre><pre class="playground"><code class="language-rust">pub enum Input {
-    Coin,
-    Turn,
+    UserMessage,
+    ModelCompletion,
 }
 
-pub struct Machine {
-    pub locked: bool,
-    pub candies: i32,
-    pub coins: i32,
+pub struct ChatBot {
+    pub awaiting_input: bool,
+    pub context_tokens: i32,
+    pub total_messages: i32,
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<ol start="3">
-<li>Turn locked or Coin unlocked does nothing.</li>
-<li>Machine out of candy ignores inputs.</li>
+<p>Rules:</p>
+<ol>
+<li><code>UserMessage</code> while <code>awaiting_input</code> -&gt; Transition to <code>!awaiting_input</code> (Generating).</li>
+<li><code>ModelCompletion</code> while <code>!awaiting_input</code> -&gt; Transition to <code>awaiting_input</code> (Ready).</li>
+<li><code>UserMessage</code> while Generating (busy) is ignored.</li>
+<li><code>ModelCompletion</code> while Ready (idle) is ignored.</li>
 </ol>
 <h2 id="67-references"><a class="header" href="#67-references">6.7 References</a></h2>
 <ul>

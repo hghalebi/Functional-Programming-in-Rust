@@ -173,58 +173,51 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-9-parser-combinators"><a class="header" href="#chapter-9-parser-combinators">Chapter 9: Parser Combinators</a></h1>
-<p>In this chapter, we explore the design of a combinator library for creating parsers. We'll use JSON parsing as our motivating use case, but the primary goal is to gain further insight into purely functional design.</p>
-<p>We will adopt an <strong>algebraic design</strong> approach. Instead of thinking about the internal representation of a parser first, we will start by designing the interface (the algebra)—the types and combinators we need—and specifying the laws they must satisfy. Only after we have a solid algebra will we worry about the concrete implementation.</p>
+                        <h1 id="chapter-9-structured-output-parsing-parser-combinators"><a class="header" href="#chapter-9-structured-output-parsing-parser-combinators">Chapter 9: Structured Output Parsing (Parser Combinators)</a></h1>
+<p>In this chapter, we explore the design of a <strong>Structured Output Extractor</strong> library. We'll use <strong>JSON Parsing</strong> as our motivating use case—specifically, extracting valid JSON from the often messy output of an LLM.</p>
+<p>We will adopt an <strong>algebraic design</strong> approach. Instead of thinking about the internal regexes first, we will start by designing the interface (the algebra)—the types and combinators we need to reliably parse Tool Calls and Structured Data.</p>
 <h2 id="91-designing-an-algebra"><a class="header" href="#91-designing-an-algebra">9.1 Designing an Algebra</a></h2>
-<p>A parser is a program that takes unstructured input (like a string or stream of tokens) and produces a structured output (like a syntax tree or a specific value). In a combinator library, we build complex parsers by composing simpler ones.</p>
-<p>Let's start with the basics. We need a type <code>Parser&lt;A&gt;</code> representing a parser that produces a value of type <code>A</code>. We also need a way to run it.</p>
+<p>An <code>Extractor</code> is a program that takes unstructured input (LLM text response) and produces a structured output (like a <code>ToolCall</code> struct). In a combinator library, we build complex extractors by composing simpler ones.</p>
+<p>Let's start with the basics. We need a type <code>Extractor&lt;A&gt;</code> representing a parser that produces a value of type <code>A</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">struct ParseError;
-</span>pub trait Parser&lt;A&gt; {
-    fn run(&amp;self, input: &amp;str) -&gt; Result&lt;A, ParseError&gt;;
+</span>pub trait Extractor&lt;A&gt; {
+    fn extract(&amp;self, input: &amp;str) -&gt; Result&lt;A, ParseError&gt;;
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>(Note: In our final implementation, <code>Parser</code> will be a struct wrapping a closure, but conceptually it's an interface provided by our library.)</p>
+<p>(Note: In our final implementation, <code>Extractor</code> will be a struct wrapping a closure.)</p>
 <h3 id="basic-primitives"><a class="header" href="#basic-primitives">Basic Primitives</a></h3>
-<p>To parse a single character or string:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Parser&lt;A&gt;(A);
-</span>pub fn char(c: char) -&gt; Parser&lt;char&gt; { Parser(c) }
-pub fn string(s: String) -&gt; Parser&lt;String&gt; { Parser(s) }
+<p>To parse a specific token (e.g. "json"):</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Extractor&lt;A&gt;(A);
+</span>pub fn token(s: String) -&gt; Extractor&lt;String&gt; { Extractor(s) }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>We expect <code>run(char('a'), "a")</code> to return <code>Ok('a')</code>.</p>
-<p>To combine parsers, we need an "or" combinator to choose between alternatives:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Parser&lt;A&gt;(A);
-</span>pub fn or&lt;A&gt;(p1: Parser&lt;A&gt;, p2: Parser&lt;A&gt;) -&gt; Parser&lt;A&gt; { p1 }
+<p>To combine parsers, we need an "or" combinator (Fallback strategy):</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Extractor&lt;A&gt;(A);
+</span>pub fn or&lt;A&gt;(p1: Extractor&lt;A&gt;, p2: Extractor&lt;A&gt;) -&gt; Extractor&lt;A&gt; { p1 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>If <code>p1</code> fails, we try <code>p2</code>.</p>
-<p>To handle repetition, we can introduce <code>many</code>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Parser&lt;A&gt;(A);
-</span>pub fn many&lt;A&gt;(p: Parser&lt;A&gt;) -&gt; Parser&lt;Vec&lt;A&gt;&gt; { Parser(vec![]) }
+<p>If <code>p1</code> fails (e.g. Model didn't use markdown code blocks), we try <code>p2</code> (e.g. Raw JSON).</p>
+<p>To handle repetition (e.g. Multiple Tool Calls), we need <code>many</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Extractor&lt;A&gt;(A);
+</span>pub fn many&lt;A&gt;(p: Extractor&lt;A&gt;) -&gt; Extractor&lt;Vec&lt;A&gt;&gt; { Extractor(vec![]) }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>And to transform the result of a parser, <code>map</code>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Parser&lt;A&gt;(A);
-</span>pub fn map&lt;A, B, F&gt;(p: Parser&lt;A&gt;, f: F) -&gt; Parser&lt;B&gt; where F: Fn(A) -&gt; B { Parser(f(p.0)) }
+<h3 id="context-sensitivity-and-flat_map"><a class="header" href="#context-sensitivity-and-flat_map">Context Sensitivity and <code>flat_map</code></a></h3>
+<p>Some parsing tasks require <strong>context sensitivity</strong>, where the next parser depends on the result of the previous one. For example, extracting a specific field based on a previously parsed "tool_name".</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Extractor&lt;A&gt;(A);
+</span>pub fn flat_map&lt;A, B, F&gt;(p: Extractor&lt;A&gt;, f: F) -&gt; Extractor&lt;B&gt; where F: Fn(A) -&gt; Extractor&lt;B&gt; { f(p.0) }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="context-sensitivity-and-flatmap"><a class="header" href="#context-sensitivity-and-flatmap">Context Sensitivity and <code>flatMap</code></a></h3>
-<p>Some parsing tasks require <strong>context sensitivity</strong>, where the next parser depends on the result of the previous one. For example, parsing a header that specifies the length of the following body. To support this, we need <code>flat_map</code>:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Parser&lt;A&gt;(A);
-</span>pub fn flat_map&lt;A, B, F&gt;(p: Parser&lt;A&gt;, f: F) -&gt; Parser&lt;B&gt; where F: Fn(A) -&gt; Parser&lt;B&gt; { f(p.0) }
-<span class="boring">fn main() {}</span></code></pre></pre>
-<p>With <code>flat_map</code>, <code>map</code> and <code>product</code> (sequencing) can be derived.</p>
 <h2 id="92-implementation"><a class="header" href="#92-implementation">9.2 Implementation</a></h2>
-<p>Now, let's look at how we can implement this algebra in Rust. Unlike Scala, where we might use trait inheritance heavily, purely functional parser combinators in Rust are often elegantly implemented using <strong>functions</strong> (closures).</p>
-<h3 id="the-parser-type"><a class="header" href="#the-parser-type">The Parser Type</a></h3>
-<p>A <code>Parser&lt;A&gt;</code> acts as a function <code>Fn(&amp;Location) -&gt; Result&lt;(A, Location), ParseError&gt;</code>. It takes a current input location and returns either a success (value + new location) or an error.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
-</span><span class="boring">struct Location;
-</span><span class="boring">struct ParseError;
-</span>#[derive(Clone)]
+<p>Purely functional parser combinators in Rust are elegantly implemented using <strong>functions</strong> (closures).</p>
+<h3 id="the-extractor-type"><a class="header" href="#the-extractor-type">The Extractor Type</a></h3>
+<p>An <code>Extractor&lt;A&gt;</code> acts as a function <code>Fn(&amp;Location) -&gt; Result&lt;(A, Location), ParseError&gt;</code>.</p>
+<pre><pre class="playground"><code class="language-rust">use std::rc::Rc;
+
+#[derive(Clone)]
 #[allow(clippy::type_complexity)]
-pub struct Parser&lt;A&gt;(Rc&lt;dyn Fn(&amp;Location) -&gt; Result&lt;(A, Location), ParseError&gt;&gt;);
-<span class="boring">fn main() {}</span></code></pre></pre>
-<p>We use <code>Rc&lt;dyn Fn...&gt;</code> to allow parsers to be cloned and shared easily, which is crucial for combinators that reuse parsers (like <code>many</code> reusing the same parser in a loop).</p>
+pub struct Extractor&lt;A&gt;(Rc&lt;dyn Fn(&amp;Location) -&gt; Result&lt;(A, Location), ParseError&gt;&gt;);
+<span class="boring">struct Location;
+</span><span class="boring">struct ParseError;
+</span><span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="location-and-error-handling"><a class="header" href="#location-and-error-handling">Location and Error Handling</a></h3>
-<p>To provide good error messages, we track the <code>Location</code> in the input string.</p>
+<p>To provide good error messages (for "Refusal" or "Retry" prompts), we track the <code>Location</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span>#[derive(Debug, Clone, PartialEq)]
 pub struct Location {
@@ -232,7 +225,7 @@ pub struct Location {
     pub offset: usize,
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>A <code>ParseError</code> contains a stack of errors, allowing us to provide detailed context (e.g., "Error in JSON object at key 'foo': expected ':'").</p>
+<p>A <code>ParseError</code> contains a stack of errors, allowing us to feed this back to the LLM: "Error parsing JSON at index 45: expected ':'".</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Debug, Clone, PartialEq)] struct Location { input: Rc&lt;String&gt;, offset: usize }
 </span>#[derive(Debug, Clone, PartialEq)]
@@ -241,16 +234,16 @@ pub struct ParseError {
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="combinators"><a class="header" href="#combinators">Combinators</a></h3>
-<p>The implementation of <code>string</code> checks if the input at the current location starts with the target string.</p>
+<p>The implementation of <code>token</code> checks if the input at the current location starts with the target string.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Debug, Clone, PartialEq)] struct Location { input: Rc&lt;String&gt;, offset: usize }
 </span><span class="boring">impl Location { fn new(input: Rc&lt;String&gt;, offset: usize) -&gt; Self { Location { input, offset } } }
 </span><span class="boring">#[derive(Debug, Clone, PartialEq)] struct ParseError { stack: Vec&lt;(Location, String)&gt; }
 </span><span class="boring">impl ParseError { fn new(loc: Location, msg: String) -&gt; Self { ParseError { stack: vec![(loc, msg)] } } }
-</span><span class="boring">struct Parser&lt;A&gt;(Rc&lt;dyn Fn(&amp;Location) -&gt; Result&lt;(A, Location), ParseError&gt;&gt;);
-</span><span class="boring">impl&lt;A&gt; Parser&lt;A&gt; { fn new&lt;F&gt;(f: F) -&gt; Self where F: Fn(&amp;Location) -&gt; Result&lt;(A, Location), ParseError&gt; + 'static { Parser(Rc::new(f)) } }
-</span>pub fn string(s: String) -&gt; Parser&lt;String&gt; {
-    Parser::new(move |loc: &amp;Location| {
+</span><span class="boring">struct Extractor&lt;A&gt;(Rc&lt;dyn Fn(&amp;Location) -&gt; Result&lt;(A, Location), ParseError&gt;&gt;);
+</span><span class="boring">impl&lt;A&gt; Extractor&lt;A&gt; { fn new&lt;F&gt;(f: F) -&gt; Self where F: Fn(&amp;Location) -&gt; Result&lt;(A, Location), ParseError&gt; + 'static { Extractor(Rc::new(f)) } }
+</span>pub fn token(s: String) -&gt; Extractor&lt;String&gt; {
+    Extractor::new(move |loc: &amp;Location| {
         let input_slice = &amp;loc.input[loc.offset..];
         if input_slice.starts_with(&amp;s) {
             Ok((s.clone(), Location::new(loc.input.clone(), loc.offset + s.len())))
@@ -260,11 +253,8 @@ pub struct ParseError {
     })
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>The <code>or</code> combinator tries the first parser, and if it fails, tries the second.</p>
-<p>The <code>flat_map</code> combinator runs the first parser, gets the result <code>a</code>, applies the function <code>f(a)</code> to get the second parser, and then runs that second parser.</p>
-<h2 id="93-parsing-json"><a class="header" href="#93-parsing-json">9.3 Parsing JSON</a></h2>
-<p>With just a few primitives (<code>string</code>, <code>regex</code> or equivalent, <code>flat_map</code>, <code>or</code>, <code>many</code>), we can build a fully functional JSON parser.</p>
-<p>We can define a <code>JSON</code> enum:</p>
+<h2 id="93-parsing-json-from-llm-output"><a class="header" href="#93-parsing-json-from-llm-output">9.3 Parsing JSON from LLM Output</a></h2>
+<p>Most LLMs return JSON, but often wrapped in text. We need an extractor that can <code>skip_until</code> the first <code>{</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::collections::HashMap;
 </span>pub enum JSON {
     JNull,
@@ -275,9 +265,8 @@ pub struct ParseError {
     JObject(HashMap&lt;String, JSON&gt;),
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<p>And then compose our parsers to handle objects, arrays, and values recursively. Since JSON is recursive, we need to handle deferred execution properly (e.g., using <code>Parser::new</code> to wrap recursive calls).</p>
 <h2 id="94-conclusion"><a class="header" href="#94-conclusion">9.4 Conclusion</a></h2>
-<p>In this chapter, we saw how algebraic design leads us to a flexible and powerful set of combinators. By focusing on the interface and laws first, we identified the core primitives (<code>flat_map</code>, <code>or</code>, <code>string</code>) needed to handle complex parsing tasks like JSON. The resulting implementation in Rust, leveraging closures and type-safe enums, is both expressive and efficient.</p>
+<p>In this chapter, we saw how algebraic design leads us to a flexible Extractor library. By focusing on primitives like <code>flat_map</code> and <code>or</code>, we can robustly handle the unpredictability of LLM textual output.</p>
 
                     </main>
 

@@ -173,110 +173,110 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="chapter-5-strictness-and-laziness"><a class="header" href="#chapter-5-strictness-and-laziness">Chapter 5: Strictness and Laziness</a></h1>
-<p>In this chapter, we explore <strong>non-strictness</strong> (laziness) to improve efficiency and modularity. We implement a <code>Stream</code> type that fuses sequences of transformations.</p>
+                        <h1 id="chapter-5-token-streaming-strictness-and-laziness"><a class="header" href="#chapter-5-token-streaming-strictness-and-laziness">Chapter 5: Token Streaming (Strictness and Laziness)</a></h1>
+<p>In this chapter, we explore <strong>non-strictness</strong> (laziness) to improve efficiency and modularity. In the context of LLMs, this is crucial for <strong>Token Streaming</strong>. We don't want to wait for the entire 4,000-token response to be generated before showing the first word. We need a <code>TokenStream</code> that fuses sequences of transformations (like filtering or stopping criteria) without realizing the full buffer.</p>
 <h2 id="51-strict-and-non-strict-functions"><a class="header" href="#51-strict-and-non-strict-functions">5.1 Strict and non-strict functions</a></h2>
 <p>Strict functions evaluate their arguments <em>before</em> the function body is executed. Non-strict functions may choose not to evaluate arguments.</p>
-<p>In Rust, arguments are strictly evaluated by default. To simulate non-strictness, we can pass a closure (thunk) <code>Fn() -&gt; A</code> instead of a value <code>A</code>.</p>
+<p>In Rust, arguments are strictly evaluated by default. To simulate non-strictness (lazy loading), we can pass a closure (thunk) <code>Fn() -&gt; A</code> instead of a value <code>A</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// logical AND is non-strict in the second argument
-// false &amp;&amp; { println!("!!"); true } // does not print
+// stop_sequence_met &amp;&amp; { println!("Generation stopped!"); true } 
 <span class="boring">}</span></code></pre></pre>
-<h2 id="52-an-extended-example-lazy-lists"><a class="header" href="#52-an-extended-example-lazy-lists">5.2 An extended example: lazy lists</a></h2>
-<p>We define a <code>Stream</code> (lazy list). In Scala, <code>Cons</code> takes by-name arguments. In Rust, we use closures wrapped in <code>Rc</code> (for sharing) to represent these thunks.</p>
+<h2 id="52-an-extended-example-token-streams"><a class="header" href="#52-an-extended-example-token-streams">5.2 An extended example: Token Streams</a></h2>
+<p>We define a <code>TokenStream</code> (lazy list). In Rust, we use closures wrapped in <code>Rc</code> (for sharing) to represent these thunks (un-generated tokens).</p>
 <pre><pre class="playground"><code class="language-rust">use std::rc::Rc;
 
 #[derive(Clone)]
-pub enum Stream&lt;A&gt; {
+pub enum TokenStream&lt;A&gt; {
     Empty,
-    Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;),
+    Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; TokenStream&lt;A&gt;&gt;),
 }
 // Note: We avoid memoization complexity for this basic translation. 
-// In a production Rust persistent stream, one might use `lazy_static` or `OnceCell` inside `Rc`.
+// In a production specific persistent stream, one might use `lazy_static` or `OnceCell`.
 <span class="boring">fn main() {
 </span><span class="boring">   // verify basic construction
-</span><span class="boring">   let _ = Stream::Cons(Rc::new(|| 1), Rc::new(|| Stream::Empty));
+</span><span class="boring">   let _ = TokenStream::Cons(Rc::new(|| "Hello"), Rc::new(|| TokenStream::Empty));
 </span><span class="boring">}</span></code></pre></pre>
-<h3 id="exercise-51-to_list"><a class="header" href="#exercise-51-to_list">Exercise 5.1: to_list</a></h3>
-<p>Force the stream into a strict <code>List</code> (or <code>Vec</code>).</p>
+<h3 id="exercise-51-collect_text-to_vec"><a class="header" href="#exercise-51-collect_text-to_vec">Exercise 5.1: collect_text (to_vec)</a></h3>
+<p>Force the stream into a strict <code>Vec</code> (Full Response).</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
-</span><span class="boring">#[derive(Clone)] pub enum Stream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;) }
-</span>// impl Stream&lt;A&gt;
-pub fn to_vec&lt;A&gt;(s: &amp;Stream&lt;A&gt;) -&gt; Vec&lt;A&gt; { // Changed &amp;self to s: &amp;Stream&lt;A&gt; for standalone function
+</span><span class="boring">#[derive(Clone)] pub enum TokenStream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; TokenStream&lt;A&gt;&gt;) }
+</span>// impl TokenStream&lt;A&gt;
+pub fn collect_text&lt;A&gt;(s: &amp;TokenStream&lt;A&gt;) -&gt; Vec&lt;A&gt; { 
     match s {
-        Stream::Empty =&gt; Vec::new(),
-        Stream::Cons(h, t) =&gt; {
+        TokenStream::Empty =&gt; Vec::new(),
+        TokenStream::Cons(h, t) =&gt; {
             let mut v = vec![h()];
-            v.extend(to_vec(&amp;t()));
+            v.extend(collect_text(&amp;t()));
             v
         }
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-52-take-and-drop"><a class="header" href="#exercise-52-take-and-drop">Exercise 5.2: take and drop</a></h3>
+<h3 id="exercise-52-limit_tokens-take-and-skip_preamble-drop"><a class="header" href="#exercise-52-limit_tokens-take-and-skip_preamble-drop">Exercise 5.2: limit_tokens (take) and skip_preamble (drop)</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
-</span><span class="boring">#[derive(Clone)] pub enum Stream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;) }
-</span><span class="boring">impl&lt;A&gt; Stream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; Stream&lt;A&gt; + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
-</span>pub fn take&lt;A: 'static&gt;(s: &amp;Stream&lt;A&gt;, n: usize) -&gt; Stream&lt;A&gt; {
+</span><span class="boring">#[derive(Clone)] pub enum TokenStream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; TokenStream&lt;A&gt;&gt;) }
+</span><span class="boring">impl&lt;A&gt; TokenStream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; TokenStream&lt;A&gt; + 'static { TokenStream::Cons(Rc::new(h), Rc::new(t)) } }
+</span>pub fn limit_tokens&lt;A: 'static&gt;(s: &amp;TokenStream&lt;A&gt;, n: usize) -&gt; TokenStream&lt;A&gt; {
     if n == 0 {
-        Stream::Empty
+        TokenStream::Empty
     } else {
         match s {
-            Stream::Empty =&gt; Stream::Empty,
-            Stream::Cons(h, t) =&gt; {
+            TokenStream::Empty =&gt; TokenStream::Empty,
+            TokenStream::Cons(h, t) =&gt; {
                 let h = h.clone();
                 let t = t.clone();
-                Stream::cons(move || h(), move || take(&amp;t(), n - 1))
+                TokenStream::cons(move || h(), move || limit_tokens(&amp;t(), n - 1))
             }
         }
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-53-take_while"><a class="header" href="#exercise-53-take_while">Exercise 5.3: take_while</a></h3>
-<p>Return all starting elements that match a predicate.</p>
+<p>Return all tokens until a Stop Sequence is met.</p>
 <h2 id="53-separating-program-description-from-evaluation"><a class="header" href="#53-separating-program-description-from-evaluation">5.3 Separating program description from evaluation</a></h2>
-<p>Laziness lets us separate the description of an expression from its evaluation.</p>
-<h3 id="exercise-54-for_all"><a class="header" href="#exercise-54-for_all">Exercise 5.4: for_all</a></h3>
-<p>Check that all elements in the Stream match a given predicate, terminating early if possible.</p>
+<p>Laziness lets us separate the description of an expression (the pipeline) from its evaluation (the generation).</p>
+<h3 id="exercise-54-validate_stream-for_all"><a class="header" href="#exercise-54-validate_stream-for_all">Exercise 5.4: validate_stream (for_all)</a></h3>
+<p>Check that all tokens in the Stream match a given predicate (e.g. "Is Safe"), terminating early if a violation occurs.</p>
 <h3 id="exercise-55-take_while-using-fold_right"><a class="header" href="#exercise-55-take_while-using-fold_right">Exercise 5.5: take_while using fold_right</a></h3>
-<h3 id="exercise-56-head_option-using-fold_right"><a class="header" href="#exercise-56-head_option-using-fold_right">Exercise 5.6: head_option using fold_right</a></h3>
+<h3 id="exercise-56-head_option-peek_first_token"><a class="header" href="#exercise-56-head_option-peek_first_token">Exercise 5.6: head_option (peek_first_token)</a></h3>
 <h3 id="exercise-57-map-filter-append-flat_map-using-fold_right"><a class="header" href="#exercise-57-map-filter-append-flat_map-using-fold_right">Exercise 5.7: map, filter, append, flat_map using fold_right</a></h3>
-<h2 id="54-infinite-streams-and-corecursion"><a class="header" href="#54-infinite-streams-and-corecursion">5.4 Infinite streams and corecursion</a></h2>
-<p>Because functions are incremental, they work for infinite streams.</p>
+<h2 id="54-infinite-streams-heartbeats"><a class="header" href="#54-infinite-streams-heartbeats">5.4 Infinite streams (Heartbeats)</a></h2>
+<p>Because functions are incremental, they work for infinite streams (e.g., a "Waiting" animation or Heartbeat signal).</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
-</span><span class="boring">#[derive(Clone)] pub enum Stream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;) }
-</span><span class="boring">impl&lt;A&gt; Stream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; Stream&lt;A&gt; + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
-</span>pub fn ones() -&gt; Stream&lt;i32&gt; {
-    Stream::cons(|| 1, ones)
+</span><span class="boring">#[derive(Clone)] pub enum TokenStream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; TokenStream&lt;A&gt;&gt;) }
+</span><span class="boring">impl&lt;A&gt; TokenStream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; TokenStream&lt;A&gt; + 'static { TokenStream::Cons(Rc::new(h), Rc::new(t)) } }
+</span>pub fn heartbeats() -&gt; TokenStream&lt;&amp;'static str&gt; {
+    TokenStream::cons(|| ".", heartbeats)
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="exercise-58-constant"><a class="header" href="#exercise-58-constant">Exercise 5.8: constant</a></h3>
 <h3 id="exercise-59-from"><a class="header" href="#exercise-59-from">Exercise 5.9: from</a></h3>
-<h3 id="exercise-510-fibs"><a class="header" href="#exercise-510-fibs">Exercise 5.10: fibs</a></h3>
-<h3 id="exercise-511-unfold"><a class="header" href="#exercise-511-unfold">Exercise 5.11: unfold</a></h3>
-<p>A general stream-building function (corecursion).</p>
+<h3 id="exercise-510-fibs-loading_simulation"><a class="header" href="#exercise-510-fibs-loading_simulation">Exercise 5.10: fibs (loading_simulation)</a></h3>
+<h3 id="exercise-511-unfold-generate_tokens"><a class="header" href="#exercise-511-unfold-generate_tokens">Exercise 5.11: unfold (generate_tokens)</a></h3>
+<p>A general stream-building function (corecursion). Ideal for wrapping an LLM API that returns chunks.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
-</span><span class="boring">#[derive(Clone)] pub enum Stream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;) }
-</span><span class="boring">impl&lt;A&gt; Stream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; Stream&lt;A&gt; + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
-</span>pub fn unfold&lt;A, S, F&gt;(z: S, f: F) -&gt; Stream&lt;A&gt;
+</span><span class="boring">#[derive(Clone)] pub enum TokenStream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; TokenStream&lt;A&gt;&gt;) }
+</span><span class="boring">impl&lt;A&gt; TokenStream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; TokenStream&lt;A&gt; + 'static { TokenStream::Cons(Rc::new(h), Rc::new(t)) } }
+</span>pub fn generate_tokens&lt;A, S, F&gt;(initial_state: S, generator: F) -&gt; TokenStream&lt;A&gt;
 where A: Clone + 'static, S: Clone + 'static, F: Fn(S) -&gt; Option&lt;(A, S)&gt; + 'static + Clone {
-    match f(z) {
-        Some((a, s)) =&gt; {
-            let f = f.clone();
-            Stream::cons(move || a.clone(), move || unfold(s.clone(), f.clone()))
+    match generator(initial_state) {
+        Some((token, next_state)) =&gt; {
+            let gen = generator.clone();
+            TokenStream::cons(move || token.clone(), move || generate_tokens(next_state.clone(), gen.clone()))
         },
-        None =&gt; Stream::Empty,
+        None =&gt; TokenStream::Empty,
     }
 }
 <span class="boring">fn main() {}</span></code></pre></pre>
-<h3 id="exercise-512-fibs-from-constant-ones-via-unfold"><a class="header" href="#exercise-512-fibs-from-constant-ones-via-unfold">Exercise 5.12: fibs, from, constant, ones via unfold</a></h3>
+<h3 id="exercise-512-fibs-from-constant-via-unfold"><a class="header" href="#exercise-512-fibs-from-constant-via-unfold">Exercise 5.12: fibs, from, constant, via unfold</a></h3>
 <h3 id="exercise-513-map-take-take_while-zip_with-zip_all-via-unfold"><a class="header" href="#exercise-513-map-take-take_while-zip_with-zip_all-via-unfold">Exercise 5.13: map, take, take_while, zip_with, zip_all via unfold</a></h3>
 <h3 id="exercise-514-starts_with"><a class="header" href="#exercise-514-starts_with">Exercise 5.14: starts_with</a></h3>
 <h3 id="exercise-515-tails"><a class="header" href="#exercise-515-tails">Exercise 5.15: tails</a></h3>
 <h3 id="exercise-516-scan_right"><a class="header" href="#exercise-516-scan_right">Exercise 5.16: scan_right</a></h3>
 <h2 id="55-summary"><a class="header" href="#55-summary">5.5 Summary</a></h2>
-<p>Laziness improves modularity by decoupling description from evaluation.</p>
+<p>Laziness improves modularity by decoupling the description of a token pipeline from its execution.</p>
 <h2 id="56-references"><a class="header" href="#56-references">5.6 References</a></h2>
 <ul>
 <li><strong>Rust Book Ch 13 (Iterators)</strong>: <a href="https://doc.rust-lang.org/book/ch13-02-iterators.html">The Rust Programming Language</a></li>
