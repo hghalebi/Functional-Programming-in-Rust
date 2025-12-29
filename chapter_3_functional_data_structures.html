@@ -186,7 +186,7 @@ pub enum List&lt;A&gt; {
     Cons(A, Rc&lt;List&lt;A&gt;&gt;),
 }
 
-use List::*;
+use self::List::*;
 
 impl&lt;A&gt; Default for List&lt;A&gt; {
     fn default() -&gt; Self {
@@ -204,7 +204,7 @@ impl&lt;A&gt; Default for List&lt;A&gt; {
 <p>Rust supports pattern matching via <code>match</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
-</span><span class="boring">use List::*;
+</span><span class="boring">use self::List::*;
 </span>pub fn sum(ints: &amp;List&lt;i32&gt;) -&gt; i32 {
     match ints {
         Nil =&gt; 0,
@@ -231,7 +231,7 @@ pub fn product(ds: &amp;List&lt;f64&gt;) -&gt; f64 {
 <p>Implement the function <code>tail</code> for removing the first element of a List. Note that the function takes constant time.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
-</span><span class="boring">use List::*;
+</span><span class="boring">use self::List::*;
 </span>pub fn tail&lt;A&gt;(l: &amp;List&lt;A&gt;) -&gt; Option&lt;&amp;Rc&lt;List&lt;A&gt;&gt;&gt; {
     match l {
         Nil =&gt; None,
@@ -247,7 +247,7 @@ pub fn product(ds: &amp;List&lt;f64&gt;) -&gt; f64 {
 <p>Implement <code>set_head</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Debug)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
-</span><span class="boring">use List::*;
+</span><span class="boring">use self::List::*;
 </span>pub fn set_head&lt;A&gt;(l: &amp;List&lt;A&gt;, h: A) -&gt; List&lt;A&gt; 
 where A: Clone {
     match l {
@@ -264,7 +264,7 @@ where A: Clone {
 <p>Generalize <code>tail</code> to <code>drop</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
-</span><span class="boring">use List::*;
+</span><span class="boring">use self::List::*;
 </span>pub fn drop&lt;A&gt;(l: &amp;List&lt;A&gt;, n: usize) -&gt; &amp;List&lt;A&gt; {
     if n == 0 {
         return l;
@@ -278,7 +278,7 @@ where A: Clone {
 <h3 id="exercise-35-dropwhile"><a class="header" href="#exercise-35-dropwhile">Exercise 3.5: DropWhile</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
-</span><span class="boring">use List::*;
+</span><span class="boring">use self::List::*;
 </span>pub fn drop_while&lt;A, F&gt;(l: &amp;List&lt;A&gt;, f: F) -&gt; &amp;List&lt;A&gt; 
 where F: Fn(&amp;A) -&gt; bool {
     match l {
@@ -292,7 +292,7 @@ where F: Fn(&amp;A) -&gt; bool {
 <em>Why can't this be constant time? Because we must rebuild the path to the new end.</em></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
-</span><span class="boring">use List::*;
+</span><span class="boring">use self::List::*;
 </span>pub fn init&lt;A: Clone&gt;(l: &amp;List&lt;A&gt;) -&gt; List&lt;A&gt; {
     match l {
         Nil =&gt; panic!("init of empty list"),
@@ -306,8 +306,8 @@ where F: Fn(&amp;A) -&gt; bool {
 <p><strong>Exercise 3.9: Length using fold_right</strong></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Clone)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
-</span><span class="boring">use List::*;
-</span><span class="boring">fn fold_right&lt;A, B, F&gt;(l: &amp;List&lt;A&gt;, z: B, f: F) -&gt; B where F: Fn(&amp;A, B) -&gt; B + Clone { match l { Nil =&gt; z, Cons(h, t) =&gt; f(h, fold_right(t, z, f)) } } 
+</span><span class="boring">use self::List::*;
+</span><span class="boring">fn fold_right&lt;A, B, F&gt;(l: &amp;List&lt;A&gt;, z: B, f: F) -&gt; B where F: Fn(&amp;A, B) -&gt; B + Clone { match l { Nil =&gt; z, Cons(h, t) =&gt; f(h, fold_right(t, z, f.clone())) } } 
 </span>pub fn length&lt;A&gt;(l: &amp;List&lt;A&gt;) -&gt; usize {
     fold_right(l, 0, |_, acc| acc + 1)
 }
@@ -315,7 +315,7 @@ where F: Fn(&amp;A) -&gt; bool {
 <p><strong>Exercise 3.10: Fold Left (Tail recursive)</strong></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Clone)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
-</span><span class="boring">use List::*;
+</span><span class="boring">use self::List::*;
 </span>pub fn fold_left&lt;A, B, F&gt;(l: &amp;List&lt;A&gt;, z: B, f: F) -&gt; B 
 where F: Fn(B, &amp;A) -&gt; B {
     match l {
@@ -327,7 +327,7 @@ where F: Fn(B, &amp;A) -&gt; B {
 <p><strong>Exercise 3.12: Reverse</strong></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">use std::rc::Rc;
 </span><span class="boring">#[derive(Clone)] enum List&lt;A&gt; { Nil, Cons(A, Rc&lt;List&lt;A&gt;&gt;) }
-</span><span class="boring">use List::*;
+</span><span class="boring">use self::List::*;
 </span><span class="boring">pub fn fold_left&lt;A, B, F&gt;(l: &amp;List&lt;A&gt;, z: B, f: F) -&gt; B where F: Fn(B, &amp;A) -&gt; B { match l { Nil =&gt; z, Cons(h, t) =&gt; fold_left(t, f(z, h), f), } }
 </span>pub fn reverse&lt;A: Clone&gt;(l: &amp;List&lt;A&gt;) -&gt; List&lt;A&gt; {
     fold_left(l, Nil, |acc, h| Cons(h.clone(), Rc::new(acc)))

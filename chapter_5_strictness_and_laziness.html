@@ -260,11 +260,11 @@ pub fn to_vec&lt;A&gt;(s: &amp;Stream&lt;A&gt;) -&gt; Vec&lt;A&gt; { // Changed 
 </span><span class="boring">#[derive(Clone)] pub enum Stream&lt;A&gt; { Empty, Cons(Rc&lt;dyn Fn() -&gt; A&gt;, Rc&lt;dyn Fn() -&gt; Stream&lt;A&gt;&gt;) }
 </span><span class="boring">impl&lt;A&gt; Stream&lt;A&gt; { fn cons&lt;F, S&gt;(h: F, t: S) -&gt; Self where F: Fn() -&gt; A + 'static, S: Fn() -&gt; Stream&lt;A&gt; + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
 </span>pub fn unfold&lt;A, S, F&gt;(z: S, f: F) -&gt; Stream&lt;A&gt;
-where F: Fn(S) -&gt; Option&lt;(A, S)&gt; + 'static + Clone {
+where A: Clone + 'static, S: Clone + 'static, F: Fn(S) -&gt; Option&lt;(A, S)&gt; + 'static + Clone {
     match f(z) {
         Some((a, s)) =&gt; {
             let f = f.clone();
-            Stream::cons(move || a.clone(), move || unfold(s, f.clone()))
+            Stream::cons(move || a.clone(), move || unfold(s.clone(), f.clone()))
         },
         None =&gt; Stream::Empty,
     }

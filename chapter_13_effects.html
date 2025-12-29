@@ -183,14 +183,14 @@ In idiomatic Rust, I/O is typically handled imperatively with <code>std::io</cod
 <p>We can model an effectful computation as a value that, when "run", performs the effect. In its simplest form, this is just a wrapper around a function (a thunk).</p>
 <pre><pre class="playground"><code class="language-rust">pub struct SimpleIO&lt;A&gt;(Box&lt;dyn FnOnce() -&gt; A&gt;);
 
-impl&lt;A&gt; SimpleIO&lt;A&gt; {
+impl&lt;A: 'static&gt; SimpleIO&lt;A&gt; {
     pub fn new&lt;F&gt;(f: F) -&gt; Self where F: FnOnce() -&gt; A + 'static { 
         SimpleIO(Box::new(f)) 
     }
     
     pub fn run(self) -&gt; A { (self.0)() }
     
-    pub fn flat_map&lt;B, F&gt;(self, f: F) -&gt; SimpleIO&lt;B&gt;
+    pub fn flat_map&lt;B: 'static, F&gt;(self, f: F) -&gt; SimpleIO&lt;B&gt;
     where F: FnOnce(A) -&gt; SimpleIO&lt;B&gt; + 'static
     {
         SimpleIO::new(move || f(self.run()).run())
@@ -207,7 +207,13 @@ impl&lt;A&gt; SimpleIO&lt;A&gt; {
 <li><strong><code>flatMap</code></strong>: Chain effects, where the second effect depends on the result of the first.</li>
 </ul>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">struct SimpleIO&lt;A&gt;(Box&lt;dyn FnOnce() -&gt; A&gt;);
-</span><span class="boring">impl&lt;A&gt; SimpleIO&lt;A&gt; { fn new&lt;F&gt;(f: F) -&gt; Self where F: FnOnce() -&gt; A + 'static { SimpleIO(Box::new(f)) } fn flat_map&lt;B, F&gt;(self, f: F) -&gt; SimpleIO&lt;B&gt; where F: FnOnce(A) -&gt; SimpleIO&lt;B&gt; + 'static { (self.0)(); f((self.0)()) } } // Mock
+</span><span class="boring">impl&lt;A: 'static&gt; SimpleIO&lt;A&gt; {
+</span><span class="boring">    fn new&lt;F&gt;(f: F) -&gt; Self where F: FnOnce() -&gt; A + 'static { SimpleIO(Box::new(f)) }
+</span><span class="boring">    fn run(self) -&gt; A { (self.0)() }
+</span><span class="boring">    fn flat_map&lt;B: 'static, F&gt;(self, f: F) -&gt; SimpleIO&lt;B&gt; where F: FnOnce(A) -&gt; SimpleIO&lt;B&gt; + 'static {
+</span><span class="boring">        SimpleIO::new(move || f((self.0)()).run())
+</span><span class="boring">    }
+</span><span class="boring">}
 </span>struct Console;
 impl Console {
     fn read_line() -&gt; SimpleIO&lt;String&gt; { SimpleIO::new(|| "Bob".to_string()) }

@@ -218,7 +218,7 @@ An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>a
 <p>If we have a <code>Tree&lt;i32&gt;</code> and we want to apply a function that might fail (returning <code>Option&lt;i32&gt;</code>) to every node, <code>traverse</code> will give us <code>Option&lt;Tree&lt;i32&gt;&gt;</code>. It turns the "Tree of Options" into an "Option of Tree".</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">pub trait Functor { type Wrapped&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
 </span><span class="boring">pub trait Applicative: Functor { fn unit&lt;A&gt;(a: A) -&gt; Self::Wrapped&lt;A&gt;; fn map2&lt;A, B, C, F&gt;(fa: Self::Wrapped&lt;A&gt;, fb: Self::Wrapped&lt;B&gt;, f: F) -&gt; Self::Wrapped&lt;C&gt;; fn map&lt;A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; Self::Wrapped&lt;B&gt; where F: Fn(A) -&gt; B; }
-</span><span class="boring">pub trait Traverse: Functor { fn traverse&lt;G, A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; G::Wrapped&lt;Self::Wrapped&lt;B&gt;&gt; where G: Applicative; }
+</span><span class="boring">pub trait Traverse: Functor { fn traverse&lt;G, A, B, F&gt;(fa: Self::Wrapped&lt;A&gt;, f: F) -&gt; G::Wrapped&lt;Self::Wrapped&lt;B&gt;&gt; where G: Applicative, F: Fn(A) -&gt; G::Wrapped&lt;B&gt; + Clone + 'static; }
 </span><span class="boring">enum Tree&lt;A&gt; { Leaf(A), Branch(Box&lt;Tree&lt;A&gt;&gt;, Box&lt;Tree&lt;A&gt;&gt;) }
 </span><span class="boring">struct TreeApp;
 </span><span class="boring">impl Functor for TreeApp { type Wrapped&lt;A&gt; = Tree&lt;A&gt;; fn map&lt;A, B, F&gt;(fa: Tree&lt;A&gt;, f: F) -&gt; Tree&lt;B&gt; where F: Fn(A) -&gt; B { match fa { Tree::Leaf(a) =&gt; Tree::Leaf(f(a)), Tree::Branch(l, r) =&gt; Tree::Branch(Box::new(Self::map(*l, &amp;f)), Box::new(Self::map(*r, f))) } } } // Dummy impl
@@ -226,11 +226,11 @@ An Applicative is defined by <code>unit</code> and <code>map2</code> (or <code>a
     fn traverse&lt;G, A, B, F&gt;(fa: Tree&lt;A&gt;, f: F) -&gt; G::Wrapped&lt;Tree&lt;B&gt;&gt;
     where G: Applicative, F: Fn(A) -&gt; G::Wrapped&lt;B&gt; + Clone + 'static { // Added bounds for compilation
         match fa {
-            Tree::Leaf(a) =&gt; G::map(f(a), |b| Tree::Leaf(b)),
+            Tree::Leaf(a) =&gt; &lt;G as Functor&gt;::map(f(a), |b| Tree::Leaf(b)),
             Tree::Branch(l, r) =&gt; {
-                let gl = Self::traverse(*l, f.clone());
-                let gr = Self::traverse(*r, f);
-                G::map2(gl, gr, |l, r| Tree::Branch(Box::new(l), Box::new(r)))
+                let gl = Self::traverse::&lt;G, _, _, _&gt;(*l, f.clone());
+                let gr = Self::traverse::&lt;G, _, _, _&gt;(*r, f);
+                G::map2(gl, gr, |l: Tree&lt;B&gt;, r: Tree&lt;B&gt;| Tree::Branch(Box::new(l), Box::new(r)))
             }
         }
     }

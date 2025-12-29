@@ -191,7 +191,7 @@
 <p>Let’s look at an example that demonstrates some of the benefits of programming with pure functions. The point here is just to illustrate some basic ideas that we’ll return to throughout this book. This will also be your first exposure to Rust's syntax if you are new to the language.</p>
 <h3 id="111-a-program-with-side-effects"><a class="header" href="#111-a-program-with-side-effects">1.1.1 A program with side effects</a></h3>
 <p>Suppose we’re implementing a program to handle purchases at a coffee shop. We’ll begin with a Rust program that uses side effects in its implementation (also called an impure program).</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Coffee { price: f64 }
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] struct Coffee { price: f64 }
 </span><span class="boring">impl Coffee { fn new() -&gt; Self { Coffee { price: 2.5 } } }
 </span><span class="boring">struct CreditCard;
 </span><span class="boring">impl CreditCard { fn charge(&amp;mut self, _price: f64) {} }
@@ -212,7 +212,7 @@ impl Cafe {
 <p>The line <code>cc.charge(cup.price)</code> is an example of a side effect. Charging a credit card involves some interaction with the outside world—suppose it requires contacting the credit card company via some web service, authorizing the transaction, charging the card, and (if successful) persisting some record of the transaction for later reference.</p>
 <p>But our function merely returns a <code>Coffee</code> and these other actions are happening on the side, hence the term “side effect.”</p>
 <p>As a result of this side effect, the code is difficult to test. We don’t want our tests to actually contact the credit card company and charge the card! This lack of testability is suggesting a design change: arguably, <code>CreditCard</code> shouldn’t have any knowledge baked into it about how to contact the credit card company to actually execute a charge, nor should it have knowledge of how to persist a record of this charge in our internal systems. We can make the code more modular and testable by letting <code>CreditCard</code> be ignorant of these concerns and passing a <code>Payments</code> object into <code>buy_coffee</code>.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">struct Coffee { price: f64 }
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone, Copy)] struct Coffee { price: f64 }
 </span><span class="boring">impl Coffee { fn new() -&gt; Self { Coffee { price: 2.5 } } }
 </span><span class="boring">struct CreditCard;
 </span><span class="boring">trait Payments { fn charge(&amp;mut self, cc: &amp;mut CreditCard, amount: f64); }
@@ -239,7 +239,7 @@ impl Cafe {
 <p>The functional solution is to eliminate side effects and have <code>buy_coffee</code> return the charge as a value in addition to returning the <code>Coffee</code>. The concerns of processing the charge by sending it off to the credit card company, persisting a record of it, and so on, will be handled elsewhere.</p>
 <p>Here’s what a functional solution might look like in Rust:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(Clone)] struct CreditCard;
-</span><span class="boring">struct Coffee { price: f64 }
+</span><span class="boring">#[derive(Clone, Copy)] struct Coffee { price: f64 }
 </span><span class="boring">impl Coffee { fn new() -&gt; Self { Coffee { price: 2.5 } } }
 </span><span class="boring">struct Charge { cc: CreditCard, amount: f64 }
 </span><span class="boring">impl Charge { fn new(cc: CreditCard, amount: f64) -&gt; Self { Charge { cc, amount } } }
@@ -283,7 +283,7 @@ impl Charge {
 </span><span class="boring">}</span></code></pre></pre>
 <p>Now let’s look at <code>buy_coffees</code>, to implement the purchase of <code>n</code> cups of coffee. Unlike before, this can now be implemented in terms of <code>buy_coffee</code>, as we had hoped.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#[derive(PartialEq, Clone)] struct CreditCard;
-</span><span class="boring">struct Coffee { price: f64 }
+</span><span class="boring">#[derive(Clone, Copy)] struct Coffee { price: f64 }
 </span><span class="boring">impl Coffee { fn new() -&gt; Self { Coffee { price: 2.5 } } }
 </span><span class="boring">#[derive(Clone)] struct Charge { cc: CreditCard, amount: f64 }
 </span><span class="boring">impl Charge { 

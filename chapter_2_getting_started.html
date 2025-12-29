@@ -191,8 +191,7 @@ pub mod my_module {
     }
 
     pub fn format_abs(x: i32) -&gt; String {
-        let msg = "The absolute value of {} is {}";
-        format!(msg, x, abs(x))
+        format!("The absolute value of {} is {}", x, abs(x))
     }
 
     pub fn main() {

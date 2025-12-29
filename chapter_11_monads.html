@@ -205,11 +205,8 @@ Learn more about GATs in the <a href="https://blog.rust-lang.org/2022/10/28/gats
 <span class="boring">fn main() {}</span></code></pre></pre>
 <h3 id="the-map2-challenge-in-rust"><a class="header" href="#the-map2-challenge-in-rust">The <code>map2</code> Challenge in Rust</a></h3>
 <p>In functional theory, <code>map2</code> can be derived from <code>flatMap</code> and <code>map</code>. However, in Rust, implementing <code>map2</code> generically via <code>flatMap</code> involves closures.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Conceptual default implementation
-flat_map(ma, |a| map(mb, |b| f(a, b)))
-<span class="boring">}</span></code></pre></pre>
+<pre><code class="language-rust ignore">// Conceptual default implementation
+flat_map(ma, |a| map(mb, |b| f(a, b)))</code></pre>
 <p>This inner closure <code>|b| f(a, b)</code> captures <code>a</code> and <code>f</code>. If the Monad executes this closure multiple times (like <code>Vec</code>/List monad, which handles non-determinism), <code>f</code> and <code>a</code> must be clonable. Because of this complexity in a generic context, we essentially require <code>map2</code> to be implemented (or specialized) by the instance, or we impose <code>Clone</code> bounds on the function <code>F</code> and the values.</p>
 <h2 id="113-instances"><a class="header" href="#113-instances">11.3 Instances</a></h2>
 <p>We implemented Monad instances for:</p>

@@ -200,8 +200,8 @@ Standard functional <code>List</code> separates them but requires loading all da
 </span><span class="boring">    fn lift&lt;F&gt;(_: F) -&gt; Process&lt;I, O&gt; where F: Fn(I) -&gt; O { Process::Halt }
 </span><span class="boring">    fn pipe&lt;O2&gt;(self, _: Process&lt;O, O2&gt;) -&gt; Process&lt;I, O2&gt; { Process::Halt }
 </span><span class="boring">}
-</span>let p1 = Process::filter(|x| x % 2 == 0); // Producers/Transducers
-let p2 = Process::lift(|x: i32| x * 10);
+</span>let p1 = Process::&lt;i32, i32&gt;::filter(|x| x % 2 == 0); // Producers/Transducers
+let p2 = Process::&lt;i32, i32&gt;::lift(|x: i32| x * 10);
 let pipeline = p1.pipe(p2); // Fused Process
 <span class="boring">fn main() {}</span></code></pre></pre>
 <p>The <code>pipe</code> implementation fuses the two machines into one. It runs <code>p2</code> until <code>p2</code> awaits input, then run <code>p1</code> to produce that input. This ensures <strong>constant memory usage</strong> (processing one element at a time) for arbitrary pipelines.</p>
