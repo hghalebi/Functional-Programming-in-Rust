@@ -1,51 +1,51 @@
-# Chapter 5: Strictness and Laziness
+# Chapter 5: Token Streaming (Strictness and Laziness)
 
-In this chapter, we explore **non-strictness** (laziness) to improve efficiency and modularity. We implement a `Stream` type that fuses sequences of transformations.
+In this chapter, we explore **non-strictness** (laziness) to improve efficiency and modularity. In the context of LLMs, this is crucial for **Token Streaming**. We don't want to wait for the entire 4,000-token response to be generated before showing the first word. We need a `TokenStream` that fuses sequences of transformations (like filtering or stopping criteria) without realizing the full buffer.
 
 ## 5.1 Strict and non-strict functions
 
 Strict functions evaluate their arguments *before* the function body is executed. Non-strict functions may choose not to evaluate arguments.
 
-In Rust, arguments are strictly evaluated by default. To simulate non-strictness, we can pass a closure (thunk) `Fn() -> A` instead of a value `A`.
+In Rust, arguments are strictly evaluated by default. To simulate non-strictness (lazy loading), we can pass a closure (thunk) `Fn() -> A` instead of a value `A`.
 
 ```rust
 // logical AND is non-strict in the second argument
-// false && { println!("!!"); true } // does not print
+// stop_sequence_met && { println!("Generation stopped!"); true } 
 ```
 
-## 5.2 An extended example: lazy lists
+## 5.2 An extended example: Token Streams
 
-We define a `Stream` (lazy list). In Scala, `Cons` takes by-name arguments. In Rust, we use closures wrapped in `Rc` (for sharing) to represent these thunks.
+We define a `TokenStream` (lazy list). In Rust, we use closures wrapped in `Rc` (for sharing) to represent these thunks (un-generated tokens).
 
 ```rust
 use std::rc::Rc;
 
 #[derive(Clone)]
-pub enum Stream<A> {
+pub enum TokenStream<A> {
     Empty,
-    Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> Stream<A>>),
+    Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> TokenStream<A>>),
 }
 // Note: We avoid memoization complexity for this basic translation. 
-// In a production Rust persistent stream, one might use `lazy_static` or `OnceCell` inside `Rc`.
+// In a production specific persistent stream, one might use `lazy_static` or `OnceCell`.
 # fn main() {
 #    // verify basic construction
-#    let _ = Stream::Cons(Rc::new(|| 1), Rc::new(|| Stream::Empty));
+#    let _ = TokenStream::Cons(Rc::new(|| "Hello"), Rc::new(|| TokenStream::Empty));
 # }
 ```
 
-### Exercise 5.1: to_list
-Force the stream into a strict `List` (or `Vec`).
+### Exercise 5.1: collect_text (to_vec)
+Force the stream into a strict `Vec` (Full Response).
 
 ```rust
 # use std::rc::Rc;
-# #[derive(Clone)] pub enum Stream<A> { Empty, Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> Stream<A>>) }
-// impl Stream<A>
-pub fn to_vec<A>(s: &Stream<A>) -> Vec<A> { // Changed &self to s: &Stream<A> for standalone function
+# #[derive(Clone)] pub enum TokenStream<A> { Empty, Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> TokenStream<A>>) }
+// impl TokenStream<A>
+pub fn collect_text<A>(s: &TokenStream<A>) -> Vec<A> { 
     match s {
-        Stream::Empty => Vec::new(),
-        Stream::Cons(h, t) => {
+        TokenStream::Empty => Vec::new(),
+        TokenStream::Cons(h, t) => {
             let mut v = vec![h()];
-            v.extend(to_vec(&t()));
+            v.extend(collect_text(&t()));
             v
         }
     }
@@ -53,21 +53,21 @@ pub fn to_vec<A>(s: &Stream<A>) -> Vec<A> { // Changed &self to s: &Stream<A> fo
 # fn main() {}
 ```
 
-### Exercise 5.2: take and drop
+### Exercise 5.2: limit_tokens (take) and skip_preamble (drop)
 ```rust
 # use std::rc::Rc;
-# #[derive(Clone)] pub enum Stream<A> { Empty, Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> Stream<A>>) }
-# impl<A> Stream<A> { fn cons<F, S>(h: F, t: S) -> Self where F: Fn() -> A + 'static, S: Fn() -> Stream<A> + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
-pub fn take<A: 'static>(s: &Stream<A>, n: usize) -> Stream<A> {
+# #[derive(Clone)] pub enum TokenStream<A> { Empty, Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> TokenStream<A>>) }
+# impl<A> TokenStream<A> { fn cons<F, S>(h: F, t: S) -> Self where F: Fn() -> A + 'static, S: Fn() -> TokenStream<A> + 'static { TokenStream::Cons(Rc::new(h), Rc::new(t)) } }
+pub fn limit_tokens<A: 'static>(s: &TokenStream<A>, n: usize) -> TokenStream<A> {
     if n == 0 {
-        Stream::Empty
+        TokenStream::Empty
     } else {
         match s {
-            Stream::Empty => Stream::Empty,
-            Stream::Cons(h, t) => {
+            TokenStream::Empty => TokenStream::Empty,
+            TokenStream::Cons(h, t) => {
                 let h = h.clone();
                 let t = t.clone();
-                Stream::cons(move || h(), move || take(&t(), n - 1))
+                TokenStream::cons(move || h(), move || limit_tokens(&t(), n - 1))
             }
         }
     }
@@ -76,64 +76,64 @@ pub fn take<A: 'static>(s: &Stream<A>, n: usize) -> Stream<A> {
 ```
 
 ### Exercise 5.3: take_while
-Return all starting elements that match a predicate.
+Return all tokens until a Stop Sequence is met.
 
 ## 5.3 Separating program description from evaluation
 
-Laziness lets us separate the description of an expression from its evaluation.
+Laziness lets us separate the description of an expression (the pipeline) from its evaluation (the generation).
 
-### Exercise 5.4: for_all
-Check that all elements in the Stream match a given predicate, terminating early if possible.
+### Exercise 5.4: validate_stream (for_all)
+Check that all tokens in the Stream match a given predicate (e.g. "Is Safe"), terminating early if a violation occurs.
 
 ### Exercise 5.5: take_while using fold_right
-### Exercise 5.6: head_option using fold_right
+### Exercise 5.6: head_option (peek_first_token)
 ### Exercise 5.7: map, filter, append, flat_map using fold_right
 
-## 5.4 Infinite streams and corecursion
+## 5.4 Infinite streams (Heartbeats)
 
-Because functions are incremental, they work for infinite streams.
+Because functions are incremental, they work for infinite streams (e.g., a "Waiting" animation or Heartbeat signal).
 
 ```rust
 # use std::rc::Rc;
-# #[derive(Clone)] pub enum Stream<A> { Empty, Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> Stream<A>>) }
-# impl<A> Stream<A> { fn cons<F, S>(h: F, t: S) -> Self where F: Fn() -> A + 'static, S: Fn() -> Stream<A> + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
-pub fn ones() -> Stream<i32> {
-    Stream::cons(|| 1, ones)
+# #[derive(Clone)] pub enum TokenStream<A> { Empty, Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> TokenStream<A>>) }
+# impl<A> TokenStream<A> { fn cons<F, S>(h: F, t: S) -> Self where F: Fn() -> A + 'static, S: Fn() -> TokenStream<A> + 'static { TokenStream::Cons(Rc::new(h), Rc::new(t)) } }
+pub fn heartbeats() -> TokenStream<&'static str> {
+    TokenStream::cons(|| ".", heartbeats)
 }
 # fn main() {}
 ```
 
 ### Exercise 5.8: constant
 ### Exercise 5.9: from
-### Exercise 5.10: fibs
-### Exercise 5.11: unfold
-A general stream-building function (corecursion).
+### Exercise 5.10: fibs (loading_simulation)
+### Exercise 5.11: unfold (generate_tokens)
+A general stream-building function (corecursion). Ideal for wrapping an LLM API that returns chunks.
 
 ```rust
 # use std::rc::Rc;
-# #[derive(Clone)] pub enum Stream<A> { Empty, Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> Stream<A>>) }
-# impl<A> Stream<A> { fn cons<F, S>(h: F, t: S) -> Self where F: Fn() -> A + 'static, S: Fn() -> Stream<A> + 'static { Stream::Cons(Rc::new(h), Rc::new(t)) } }
-pub fn unfold<A, S, F>(z: S, f: F) -> Stream<A>
+# #[derive(Clone)] pub enum TokenStream<A> { Empty, Cons(Rc<dyn Fn() -> A>, Rc<dyn Fn() -> TokenStream<A>>) }
+# impl<A> TokenStream<A> { fn cons<F, S>(h: F, t: S) -> Self where F: Fn() -> A + 'static, S: Fn() -> TokenStream<A> + 'static { TokenStream::Cons(Rc::new(h), Rc::new(t)) } }
+pub fn generate_tokens<A, S, F>(initial_state: S, generator: F) -> TokenStream<A>
 where A: Clone + 'static, S: Clone + 'static, F: Fn(S) -> Option<(A, S)> + 'static + Clone {
-    match f(z) {
-        Some((a, s)) => {
-            let f = f.clone();
-            Stream::cons(move || a.clone(), move || unfold(s.clone(), f.clone()))
+    match generator(initial_state) {
+        Some((token, next_state)) => {
+            let gen = generator.clone();
+            TokenStream::cons(move || token.clone(), move || generate_tokens(next_state.clone(), gen.clone()))
         },
-        None => Stream::Empty,
+        None => TokenStream::Empty,
     }
 }
 # fn main() {}
 ```
 
-### Exercise 5.12: fibs, from, constant, ones via unfold
+### Exercise 5.12: fibs, from, constant, via unfold
 ### Exercise 5.13: map, take, take_while, zip_with, zip_all via unfold
 ### Exercise 5.14: starts_with
 ### Exercise 5.15: tails
 ### Exercise 5.16: scan_right
 
 ## 5.5 Summary
-Laziness improves modularity by decoupling description from evaluation.
+Laziness improves modularity by decoupling the description of a token pipeline from its execution.
 
 ## 5.6 References
 

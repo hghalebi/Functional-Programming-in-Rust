@@ -1,49 +1,49 @@
-# Chapter 15: Stream Processing and Incremental I/O
+# Chapter 15: Streaming Pipelines
 
-The final step in our journey is to handle I/O incrementally. We want to process data (like lines in a large file) without loading everything into memory (like `List` or `Vec`), but still retain the composability of `map`, `filter`, and `fold`.
+The final step in our journey is to handle I/O incrementally. We want to process data (like streams of tokens from an LLM) without loading everything into memory, but still retain the composability of `map`, `filter`, and `fold`.
 
-## 15.1 The Problem with I/O
+## 15.1 The Problem with LLM Streams
 
-Standard imperative I/O mixes the *what* (logic) with the *how* (looping, reading). 
-Standard functional `List` separates them but requires loading all data into memory first.
+Standard imperative loops mix the *logic* (what to detect) with the *mechanics* (how to buffer tokens).
+Standard functional `List` requires waiting for the full response (high latency).
 
-## 15.2 The Process Algebra
+## 15.2 The Pipeline Algebra
 
-We define `Process<I, O>` as a state machine that can:
-1.  **Emit** a value of type `O` and transition to a new state.
-2.  **Await** a value of type `I` and transition to a new state.
+We define `Pipeline<I, O>` as a state machine that can:
+1.  **YieldEvent** a value of type `O`.
+2.  **AwaitInput** of type `I`.
 3.  **Halt**.
 
 ```rust
-pub enum Process<I, O> {
-    Emit(O, Box<Process<I, O>>),
-    Await(Box<dyn FnOnce(Option<I>) -> Process<I, O>>),
+pub enum Pipeline<I, O> {
+    YieldEvent(O, Box<Pipeline<I, O>>),
+    AwaitInput(Box<dyn FnOnce(Option<I>) -> Pipeline<I, O>>),
     Halt,
 }
 # fn main() {}
 ```
 
-This is a **Pull-based** stream. The driver calls the process; if the process is `Emit`ting, the driver collects the value. If the process is `Await`ing, the driver fetches inputs (e.g., from a file) and feeds them in.
+This is a **Pull-based** stream. The driver calls the pipeline; if it yields, we show the token. If it awaits, we fetch the next token from the API.
 
 ## 15.3 Composition: The Pipe (`|>`)
 
-The true power comes from `pipe`. We can feed the output of one process into the input of another.
+The true power comes from `pipe`. We can feed the output of one pipeline (e.g. `Tokenizer`) into the input of another (e.g. `StopSequenceDetector`).
 
 ```rust
-# enum Process<I, O> { Emit(O, Box<Process<I, O>>), Await(Box<dyn FnOnce(Option<I>) -> Process<I, O>>), Halt }
-# impl<I, O> Process<I, O> {
-#     fn filter<F>(_: F) -> Process<I, I> where F: Fn(&I) -> bool { Process::Halt }
-#     fn lift<F>(_: F) -> Process<I, O> where F: Fn(I) -> O { Process::Halt }
-#     fn pipe<O2>(self, _: Process<O, O2>) -> Process<I, O2> { Process::Halt }
+# enum Pipeline<I, O> { YieldEvent(O, Box<Pipeline<I, O>>), AwaitInput(Box<dyn FnOnce(Option<I>) -> Pipeline<I, O>>), Halt }
+# impl<I, O> Pipeline<I, O> {
+#     fn filter<F>(_: F) -> Pipeline<I, I> where F: Fn(&I) -> bool { Pipeline::Halt }
+#     fn lift<F>(_: F) -> Pipeline<I, O> where F: Fn(I) -> O { Pipeline::Halt }
+#     fn pipe<O2>(self, _: Pipeline<O, O2>) -> Pipeline<I, O2> { Pipeline::Halt }
 # }
-let p1 = Process::<i32, i32>::filter(|x| x % 2 == 0); // Producers/Transducers
-let p2 = Process::<i32, i32>::lift(|x: i32| x * 10);
-let pipeline = p1.pipe(p2); // Fused Process
+let p1 = Pipeline::<i32, i32>::filter(|token_id| *token_id != 0); // Filter padding
+let p2 = Pipeline::<i32, i32>::lift(|x| x); // Pass through
+let pipeline = p1.pipe(p2); // Fused Pipeline
 # fn main() {}
 ```
 
-The `pipe` implementation fuses the two machines into one. It runs `p2` until `p2` awaits input, then run `p1` to produce that input. This ensures **constant memory usage** (processing one element at a time) for arbitrary pipelines.
+The `pipe` implementation fuses the two machines into one. It ensures **constant memory usage** (processing one token at a time).
 
 ## 15.4 Conclusion
 
-This architecture (often called **Iteratees**, **Transducers**, or **Pull Streams**) is the foundation of modern functional streaming libraries like `fs2` (Scala) or `futures::Stream` (Rust). It allows us to process infinite streams or massive files with the same elegance as operating on small lists.
+This architecture is the foundation of modern Agentic streaming libraries. It allows us to process infinite streams of reasoning or massive context contexts with elegance.

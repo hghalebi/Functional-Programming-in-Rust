@@ -1,12 +1,12 @@
-# Chapter 4: Handling errors without exceptions
+# Chapter 4: Handling Hallucinations (Error Handling)
 
-Throwing exceptions is a side effect. In functional programming, we prefer to representing failures and exceptions with ordinary values. This preserves referential transparency.
+Throwing exceptions is a side effect. In Agentic programming, we often deal with unreliable components: LLMs hallucinate, Tools fail, and APIs timeout. We prefer representing these failures as **ordinary values**. This preserves referential transparency and allows our Agents to reason about their own failures.
 
-In this chapter, we re-create two standard library types: `Option` and `Either`.
+In this chapter, we re-create two standard library types: `Option` (Missing values) and `Either` (Failures with reasons).
 
 ## 4.1 The Option data type
 
-We represent the possibility of an undefined result with `Option`.
+We represent the possibility of an undefined result (e.g., "Tool produced no output" or "Regex failed to capture") with `Option`.
 
 ```rust
 pub enum Option<A> {
@@ -35,14 +35,14 @@ impl<A> Option<A> {
     where F: FnOnce(A) -> Option<B> {
         match self {
             Option::Some(a) => f(a),
-            Option::None => Option::None,
+            Option::None => Option::None, // Failure propagates
         }
     }
 
     pub fn get_or_else(self, default: A) -> A {
         match self {
             Option::Some(a) => a,
-            Option::None => default,
+            Option::None => default, // Fallback value
         }
     }
 
@@ -50,7 +50,7 @@ impl<A> Option<A> {
     where F: FnOnce() -> Option<A> {
         match self {
             Option::Some(_) => self,
-            Option::None => ob(),
+            Option::None => ob(), // Try another strategy (Fallback Agent)
         }
     }
 
@@ -65,31 +65,30 @@ impl<A> Option<A> {
 # fn main() {}
 ```
 
-### Exercise 4.2: Variance
-Implement `variance` in terms of `flat_map`.
-Variance is the mean of `math.pow(x - m, 2)`.
+### Exercise 4.2: Variance (Latency Analysis)
+Implement `variance` for analyzing API latency stability.
 
 ```rust
 # #[derive(Clone, Copy)] pub enum Option<A> { Some(A), None }
 # impl<A> Option<A> { 
 #    pub fn flat_map<B, F>(self, f: F) -> Option<B> where F: FnOnce(A) -> Option<B> { match self { Option::Some(a) => f(a), Option::None => Option::None } } 
 # }
-fn mean(xs: &[f64]) -> Option<f64> {
-    if xs.is_empty() {
+fn average_latency(latencies: &[f64]) -> Option<f64> {
+    if latencies.is_empty() {
         Option::None
     } else {
-        Option::Some(xs.iter().sum::<f64>() / xs.len() as f64)
+        Option::Some(latencies.iter().sum::<f64>() / latencies.len() as f64)
     }
 }
 
-pub fn variance(xs: &[f64]) -> Option<f64> {
-    mean(xs).flat_map(|m| mean(&xs.iter().map(|x| (x - m).powi(2)).collect::<Vec<_>>()))
+pub fn latency_variance(latencies: &[f64]) -> Option<f64> {
+    average_latency(latencies).flat_map(|m| average_latency(&latencies.iter().map(|x| (x - m).powi(2)).collect::<Vec<_>>()))
 }
 # fn main() {}
 ```
 
-### Exercise 4.3: Map2
-Combine two Option values.
+### Exercise 4.3: Map2 (Combine Tool Outputs)
+Combine two Option values (e.g. `search_result` and `weather_data`). If either failed, the combination fails.
 
 ```rust
 # #[derive(Clone, Copy)] pub enum Option<A> { Some(A), None }
@@ -97,19 +96,19 @@ Combine two Option values.
 #    pub fn flat_map<B, F>(self, f: F) -> Option<B> where F: FnOnce(A) -> Option<B> { match self { Option::Some(a) => f(a), Option::None => Option::None } } 
 #    pub fn map<B, F>(self, f: F) -> Option<B> where F: FnOnce(A) -> B { match self { Option::Some(a) => Option::Some(f(a)), Option::None => Option::None } }
 # }
-pub fn map2<A, B, C, F>(a: Option<A>, b: Option<B>, f: F) -> Option<C>
+pub fn combine_tool_outputs<A, B, C, F>(a: Option<A>, b: Option<B>, f: F) -> Option<C>
 where F: FnOnce(A, B) -> C {
     a.flat_map(|aa| b.map(|bb| f(aa, bb)))
 }
 # fn main() {}
 ```
 
-### Exercise 4.4: Sequence
-Combine a list of Options into one Option containing a list.
+### Exercise 4.4: Sequence (Batch Execution)
+Combine a list of optional results into one Option containing a list. If *any* tool failed, the whole batch fails.
 
 ```rust
 # pub enum Option<A> { Some(A), None }
-pub fn sequence<A>(a: Vec<Option<A>>) -> Option<Vec<A>> {
+pub fn sequence_results<A>(a: Vec<Option<A>>) -> Option<Vec<A>> {
     let mut res = Vec::new();
     for opt in a {
         match opt {
@@ -122,13 +121,15 @@ pub fn sequence<A>(a: Vec<Option<A>>) -> Option<Vec<A>> {
 # fn main() {}
 ```
 
-### Exercise 4.5: Traverse
+### Exercise 4.5: Traverse (Parallel Execution)
+Map a function (e.g., `execute_tool`) over a list of inputs.
+
 ```rust
 # pub enum Option<A> { Some(A), None }
-pub fn traverse<A, B, F>(a: Vec<A>, f: F) -> Option<Vec<B>>
+pub fn traverse_executions<A, B, F>(inputs: Vec<A>, f: F) -> Option<Vec<B>>
 where F: Fn(A) -> Option<B> {
     let mut res = Vec::new();
-    for x in a {
+    for x in inputs {
         match f(x) {
             Option::Some(y) => res.push(y),
             Option::None => return Option::None,
@@ -141,12 +142,12 @@ where F: Fn(A) -> Option<B> {
 
 ## 4.4 The Either data type
 
-`Option` doesn't tell us *why* something failed. `Either` lets us track a reason.
+`Option` doesn't tell us *why* something failed (e.g., "Rate Limit Exceeded" vs "Invalid JSON"). `Either` lets us track a failure reason.
 
 ```rust
 pub enum Either<E, A> {
-    Left(E),
-    Right(A),
+    Left(E), // The "Error" or "Refusal"
+    Right(A), // The "Success" or "Tool Output"
 }
 # fn main() {}
 ```
@@ -182,7 +183,7 @@ impl<E, A> Either<E, A> {
     {
         match self {
             Either::Right(a) => Either::Right(a),
-            Either::Left(_) => b(),
+            Either::Left(_) => b(), // Retry!
         }
     }
     
@@ -202,11 +203,11 @@ impl<E, A> Either<E, A> {
 
 ```rust
 # pub enum Either<E, A> { Left(E), Right(A) }
-pub fn sequence_either<E, A>(es: Vec<Either<E, A>>) -> Either<E, Vec<A>> {
-    traverse_either(es, |x| x)
+pub fn sequence_execution<E, A>(es: Vec<Either<E, A>>) -> Either<E, Vec<A>> {
+    traverse_execution(es, |x| x)
 }
 
-pub fn traverse_either<E, A, B, F>(as_vec: Vec<A>, f: F) -> Either<E, Vec<B>>
+pub fn traverse_execution<E, A, B, F>(as_vec: Vec<A>, f: F) -> Either<E, Vec<B>>
 where F: Fn(A) -> Either<E, B> {
     let mut res = Vec::new();
     for a in as_vec {
@@ -220,11 +221,11 @@ where F: Fn(A) -> Either<E, B> {
 # fn main() {}
 ```
 
-### Exercise 4.8: Accumulating Errors
-To report *both* errors in `mkPerson` (name and age invalid), we would need a data structure that can hold multiple errors, like `Validation<Vec<E>, A>`. `Either` stops at the first error (fail-fast).
+### Exercise 4.8: Accumulating Errors (Validation)
+To report *both* "Model Refusal" AND "Context Limit Exceeded", we would need a data structure that can hold multiple errors, like `Validation<Vec<E>, A>`. `Either` stops at the first error (fail-fast).
 
 ## 4.5 Summary
-We learned to handle errors as values using `Option` and `Either`.
+We learned to handle Agent failures and hallucinations as values using `Option` and `Either`.
 
 ## 4.6 References
 

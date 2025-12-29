@@ -1,63 +1,42 @@
-# Chapter 14: Local Effects and Mutable State
+# Chapter 14: Scratchpads (Local Effects)
 
-In functional programming, we emphasize immutability. However, some algorithms (like Quicksort, HashMaps, or graph traversals) are naturally expressed with mutable state. The types `ST` (State Thread) and `STRef` allow us to use mutable state *locally* while remaining externally pure.
+In Agentic programming, we maintain purity in our interfaces ("Input -> Output"). However, some internal reasoning steps (like sorting evidence, accumulating stats, or graph search) are naturally expressed with mutable state. The types `Scratchpad` (ST) and `ScratchRef` allow an Agent to use mutable memory *locally* while remaining externally pure.
 
-## 14.1 Purely Functional In-Place Mutation?
+## 14.1 Purely Functional In-Place Reasoning?
 
 It sounds like a contradiction. How can we have mutation in a pure function?
 The key is **Scope**.
-If a function allocates a mutable array, modifies it, and then returns a frozen (immutable) copy (or a result derived from it), and *no one else* ever saw the mutable version, then the function is pure from the outside.
+If an Agent allocates a mutable "Scratchpad", scribbles on it, and then returns a frozen summary, and *no one else* ever saw the scratchpad, then the Agent appears pure from the outside.
 
-## 14.2 The ST Monad in Rust
+## 14.2 The Scratchpad Monad
 
-We implemented `ST<'a, A>` where `'a` represents the "thread" or scope of the mutation.
+We implemented `Scratchpad<'a, A>` where `'a` represents the "thread" or scope of the scratchpad.
 
 ```rust
-pub struct ST<'a, A> {
+pub struct Scratchpad<'a, A> {
     run: Box<dyn FnOnce() -> A + 'a>, // Closure capturing mutable 'a references
 }
 # fn main() {}
 ```
 
-### Preventing Leakage
-The danger is leaking a mutable reference:
-```rust,compile_fail
-# struct STRef<'a, T>(std::marker::PhantomData<&'a T>);
-# impl<'a, T> STRef<'a, T> { fn new(_: T) -> Self { STRef(std::marker::PhantomData) } }
-# struct ST<'a, A>(std::marker::PhantomData<&'a A>);
-# fn run_st<A>(_: STRef) { }
-let r = run_st(STRef::new(1)); // ERROR! Result cannot be STRef
-# fn main() {}
-```
+### Preventing Leakage (Data Privacy)
 
-In Rust, we prevent this using Higher-Rank Trait Bounds (HRTB) in the `run_st` function:
+The danger is leaking a mutable reference to the global scope (Hallucinating internal state into the final answer).
+Rust's Higher-Rank Trait Bounds (HRTB) prevent this leakage. The phantom lifetime `'a` ensures that `ScratchRef` cannot escape the `run_scratchpad` block.
 
 ```rust
-# struct ST<'a, A>(std::marker::PhantomData<&'a A>);
-pub trait RunnableST<A> {
-    fn apply<'a>(&self) -> ST<'a, A>;
-}
-
-pub fn run_st<A>(st: &impl RunnableST<A>) -> A { unimplemented!() }
+# struct ScratchRef<'a, T>(std::marker::PhantomData<&'a T>);
+# impl<'a, T> ScratchRef<'a, T> { fn new(_: T) -> Self { ScratchRef(std::marker::PhantomData) } }
+# struct Scratchpad<'a, A>(std::marker::PhantomData<&'a A>);
+# fn run_scratchpad<A, T>(_: ScratchRef<'_, T>) { }
+// let leaking_ref = run_scratchpad(ScratchRef::new(1)); // ERROR! Result cannot be ScratchRef
 # fn main() {}
 ```
-
-Because `run_st` enforces that `RunnableST` works for *any* `'a` (`for<'a>`), the return type `A` cannot depend on `'a`. `STRef<'a, T>` depends on `'a`, so it cannot be returned. `Vec<T>` (via `freeze()`) does *not* depend on `'a`, so it is safe to return.
 
 ## 14.3 Comparison with Rust References
 
-Rust's borrow checker provides similar guarantees natively:
-- `&mut T` ensures exclusive access (effectively a local state thread).
-- Lifetimes (`'a`) ensure references don't escape their owner.
-
-In a sense, **Rust is the ST Monad**. Every block of code with local variables is an implicit `ST` computation. However, the explicit `ST` monad is useful when we want to treat "stateful computations" as First-Class Values (e.g., to pass them around, combine them safely, or implement "Ghost Types" patterns).
+In a sense, **Rust is the Scratchpad Monad**. Every block of code with local variables is an implicit `Scratchpad` computation. However, the explicit `Scratchpad` monad is useful when we want to treat "stateful reasoning" as First-Class Values.
 
 ## 14.4 Conclusion
 
-We now have the ability to write efficient, in-place algorithms (like the `partition` step of Quicksort) using the `ST` monad, wrapping them safely so they appear pure to the rest of the program.
-
-## 14.5 Rust Equivalents
-
-*   **Smart Pointers**: [The Rust Book Ch 15](https://doc.rust-lang.org/book/ch15-00-smart-pointers.html)
-*   **Interior Mutability (`RefCell`)**: [The Rust Book Ch 15.5](https://doc.rust-lang.org/book/ch15-05-interior-mutability.html)
-*   **Lifetimes**: [The Rust Book Ch 10.3](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html)
+We now have the ability to write efficient, in-place algorithms (like "Evidence Sorting") using the `Scratchpad` monad, wrapping them safely so they appear pure to the rest of the orchestration system.

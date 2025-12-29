@@ -1,6 +1,6 @@
 # Chapter 2: Getting started with functional programming in Rust
 
-In this chapter, we’ll begin learning how to write programs in the Rust language just by combining pure functions. This chapter is mainly intended for those readers who are new to Rust, to functional programming, or both.
+In this chapter, we’ll begin learning how to write programs in the Rust language just by combining pure functions (Deterministic Tools). This chapter is mainly intended for those readers who are new to Rust, to functional programming, or both.
 
 ## 2.1 Introducing Rust: an example
 
@@ -12,20 +12,22 @@ The following is a complete program listing in Rust. Our goal is just to introdu
 /// A documentation comment
 
 pub mod my_module {
-    pub fn abs(n: i32) -> i32 {
-        if n < 0 {
-            -n
+    /// Pure function to calculate remaining tokens in a context window
+    pub fn remaining_context(used: i32, limit: i32) -> i32 {
+        let remaining = limit - used;
+        if remaining < 0 {
+            0
         } else {
-            n
+            remaining
         }
     }
 
-    pub fn format_abs(x: i32) -> String {
-        format!("The absolute value of {} is {}", x, abs(x))
+    pub fn format_status(used: i32) -> String {
+        format!("Context used: {}, Remaining: {}", used, remaining_context(used, 8192))
     }
 
     pub fn main() {
-        println!("{}", format_abs(-42));
+        println!("{}", format_status(4000));
     }
 }
 # fn main() {
@@ -35,7 +37,7 @@ pub mod my_module {
 
 We declare a module `my_module`. This is simply to give our code a place to live. Rust code is organized into modules (`mod`) and creates (structs, enums).
 
-The `abs` function is a pure function that takes an integer and returns its absolute value. Note the absence of an explicit `return` keyword. The value returned from a function is simply whatever value results from evaluating the last expression in the block.
+The `remaining_context` function is a pure function that takes two integers and returns the remaining capacity. Note the absence of an explicit `return` keyword. The value returned from a function is simply whatever value results from evaluating the last expression in the block.
 
 ## 2.2 Running our program
 
@@ -51,10 +53,10 @@ Functions are values. They can be assigned to variables, stored in data structur
 
 ### 2.3.1 A short detour: writing loops functionally
 
-First, let’s write `factorial`:
+First, let’s write `retry_backoff` to calculate the wait time (in ms) for the `n`th retry of a failed API call (simple factorial-style growth for demonstration):
 
 ```rust
-fn factorial(n: i32) -> i32 {
+fn retry_backoff(n: i32) -> i32 {
     fn go(n: i32, acc: i32) -> i32 {
         if n <= 0 {
             acc
@@ -65,17 +67,17 @@ fn factorial(n: i32) -> i32 {
     go(n, 1)
 }
 # fn main() {
-#     assert_eq!(factorial(5), 120);
+#     assert_eq!(retry_backoff(5), 120);
 # }
 ```
 
-The way we write loops functionally, without mutating a loop variable, is with a recursive function. Rust supports recursion, though it does not guarantee **tail call elimination** (TCO) in the same way Scala or Scheme might. For deep recursion, Rust programmers often use `loop`, `while`, or iterators to avoid blowing the stack. However, for the sake of learning FP concepts, we will use recursion here.
+The way we write loops functionally, without mutating a loop variable, is with a recursive function. Rust supports recursion, though it does not guarantee **tail call elimination** (TCO) in the same way Scala or Scheme might. For deep recursion (like an infinite agent loop), Rust programmers often use `loop`, `while`, or iterators to avoid blowing the stack. However, for the sake of learning FP concepts, we will use recursion here.
 
 ### Exercise 2.1
-Write a recursive function to get the `n`th Fibonacci number. The first two Fibonacci numbers are 0 and 1. The `n`th number is always the sum of the previous two.
+Write a recursive function to simulate a simplified Fibonacci-style token generation curve. The 0th and 1st steps produce 0 and 1 tokens respectively. The `n`th step produces the sum of the previous two.
 
 ```rust
-pub fn fib(n: u32) -> u32 {
+pub fn token_simulation(n: u32) -> u32 {
     fn go(n: u32, prev: u32, curr: u32) -> u32 {
         if n == 0 {
             prev
@@ -86,24 +88,24 @@ pub fn fib(n: u32) -> u32 {
     go(n, 0, 1)
 }
 # fn main() {
-#     assert_eq!(fib(0), 0);
-#     assert_eq!(fib(1), 1);
-#     assert_eq!(fib(5), 5);
-#     assert_eq!(fib(6), 8);
+#     assert_eq!(token_simulation(0), 0);
+#     assert_eq!(token_simulation(1), 1);
+#     assert_eq!(token_simulation(5), 5);
+#     assert_eq!(token_simulation(6), 8);
 # }
 ```
 
 ### 2.3.2 Writing our first higher-order function
 
-We can generalize `format_abs` and `format_factorial` to a single function `format_result`:
+We can generalize `format_status` and `format_backoff` to a single function `format_metric`:
 
 ```rust
-fn format_result(name: &str, n: i32, f: fn(i32) -> i32) -> String {
-    format!("The {} of {} is {}.", name, n, f(n))
+fn format_metric(name: &str, n: i32, f: fn(i32) -> i32) -> String {
+    format!("The {} for input {} is {}.", name, n, f(n))
 }
 # fn main() {
 #     fn double(x: i32) -> i32 { x * 2 }
-#     println!("{}", format_result("double", 21, double));
+#     println!("{}", format_metric("doubling", 21, double));
 # }
 ```
 
@@ -115,12 +117,14 @@ We can write functions that work for any type.
 
 ### 2.4.1 An example of a polymorphic function
 
+Finding the first relevant Tool Call in a list of messages:
+
 ```rust
-fn find_first<A, F>(as_slice: &[A], p: F) -> Option<usize> 
+fn find_first_tool<A, F>(items: &[A], predicate: F) -> Option<usize> 
 where F: Fn(&A) -> bool {
     let mut n = 0;
-    while n < as_slice.len() {
-        if p(&as_slice[n]) {
+    while n < items.len() {
+        if predicate(&items[n]) {
             return Some(n);
         }
         n += 1;
@@ -128,22 +132,22 @@ where F: Fn(&A) -> bool {
     None
 }
 # fn main() {
-#     let data = vec![1, 2, 3, 4, 5];
-#     assert_eq!(find_first(&data, |x| *x == 3), Some(2));
+#     let tools = vec!["search", "calculator", "weather"];
+#     assert_eq!(find_first_tool(&tools, |x| *x == "calculator"), Some(1));
 # }
 ```
 
 Here, `A` is a generic type parameter. `F` is a generic type bounded by the `Fn` trait.
 
 ### Exercise 2.2
-Implement `is_sorted`, which checks whether a slice `&[A]` is sorted according to a given comparison function.
+Implement `is_chronological`, which checks whether a slice of `Message`s `&[A]` is sorted according to a given comparison function (e.g., timestamps).
 
 ```rust
-pub fn is_sorted<A, F>(as_slice: &[A], ordered: F) -> bool 
+pub fn is_chronological<A, F>(messages: &[A], ordered: F) -> bool 
 where F: Fn(&A, &A) -> bool {
     let mut n = 0;
-    while n + 1 < as_slice.len() {
-        if !ordered(&as_slice[n], &as_slice[n+1]) {
+    while n + 1 < messages.len() {
+        if !ordered(&messages[n], &messages[n+1]) {
             return false;
         }
         n += 1;
@@ -151,16 +155,15 @@ where F: Fn(&A, &A) -> bool {
     true
 }
 # fn main() {
-#     assert!(is_sorted(&[1, 2, 3], |a, b| a <= b));
-#     assert!(!is_sorted(&[1, 3, 2], |a, b| a <= b));
+#     assert!(is_chronological(&[1, 2, 3], |a, b| a <= b));
+#     assert!(!is_chronological(&[1, 3, 2], |a, b| a <= b));
 # }
 ```
 
 ## 2.5 Following types to implementations
 
 ### Exercise 2.3 (Currying)
-Currying converts a function `f` of two arguments into a function of one argument that partially applies `f`.
-Note: In Rust, returning closures involving references or generics can be complex due to lifetimes. We use `impl Fn` (existential type) to return a closure.
+Currying converts a function `f` of two arguments (e.g., a function taking `(SystemPrompt, UserQuery)`) into a function of one argument that partially applies the first (e.g., returns a function waiting for `UserQuery` with `SystemPrompt` baked in).
 
 ```rust
 pub fn curry<A, B, C, F>(f: F) -> impl Fn(A) -> Box<dyn Fn(B) -> C>
@@ -199,7 +202,7 @@ where
 ```
 
 ### Exercise 2.5 (Compose)
-Implement the higher-order function that composes two functions.
+Implement the higher-order function that composes two functions (e.g., compose `extract_json` and `execute_tool`).
 
 ```rust
 pub fn compose<A, B, C, F, G>(f: F, g: G) -> impl Fn(A) -> C
@@ -219,7 +222,7 @@ where
 ```
 
 ## 2.6 Summary
-We introduced Rust syntax, recursion, higher-order functions (HOFs), and polymorphism.
+We introduced Rust syntax, recursion, higher-order functions (Combined Tools), and polymorphism.
 
 ## 2.7 References
 

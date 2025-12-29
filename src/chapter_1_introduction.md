@@ -9,10 +9,11 @@ Functional programming (FP) is based on a simple premise with far-reaching impli
 - Printing to the console or reading user input
 - Reading from or writing to a file
 - Drawing on the screen
+- **Calling an external API (like an LLM or Database)**
 
-We’ll provide a more precise definition of side effects later in this chapter, but consider what programming would be like without the ability to do these things, or with significant restrictions on when and how these actions can occur. It may be difficult to imagine. How is it even possible to write useful programs at all? If we can’t reassign variables, how do we write simple programs like loops? What about working with data that changes, or handling errors without throwing exceptions? How can we write programs that must perform I/O, like drawing to the screen or reading from a file?
+We’ll provide a more precise definition of side effects later in this chapter, but consider what programming would be like without the ability to do these things. It may be difficult to imagine. How is it even possible to write useful Agentic workflows at all? If we can't call APIs or update memory, how do our Agents do anything?
 
-The answer is that functional programming is a restriction on how we write programs, but not on what programs we can express. Over the course of this book, we’ll learn how to express all of our programs without side effects, and that includes programs that perform I/O, handle errors, and modify data. We’ll learn how following the discipline of FP is tremendously beneficial because of the increase in modularity that we gain from programming with pure functions. Because of their modularity, pure functions are easier to test, reuse, parallelize, generalize, and reason about. Furthermore, pure functions are much less prone to bugs.
+The answer is that functional programming is a restriction on *how* we write programs, but not on *what* programs we can express. Over the course of this book, we’ll learn how to express all of our Agentic workflows without side effects, and that includes programs that perform I/O, handle errors, and manage context. We’ll learn how following the discipline of FP is tremendously beneficial because of the increase in modularity that we gain from programming with pure functions (which we can think of as **Deterministic Tools**). Because of their modularity, these tools are easier to test, reuse, parallelize, generalize, and reason about. Furthermore, pure functions are much less prone to bugs (or hallucinations in logic).
 
 In this chapter, we’ll look at a simple program with side effects and demonstrate some of the benefits of FP by removing these side effects. We’ll also discuss the benefits of FP more generally and define two important concepts—referential transparency and the substitution model.
 
@@ -22,197 +23,194 @@ Let’s look at an example that demonstrates some of the benefits of programming
 
 ### 1.1.1 A program with side effects
 
-Suppose we’re implementing a program to handle purchases at a coffee shop. We’ll begin with a Rust program that uses side effects in its implementation (also called an impure program).
+Suppose we’re implementing a client to interact with an Large Language Model (LLM). We want to generate text completions and bill our users for the tokens they consume. We’ll begin with a Rust program that uses side effects in its implementation (also called an impure program).
 
 ```rust
-# #[derive(Clone, Copy)] struct Coffee { price: f64 }
-# impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
-# struct CreditCard;
-# impl CreditCard { fn charge(&mut self, _price: f64) {} }
-struct Cafe;
+# #[derive(Clone, Copy)] struct Completion { tokens: i32 }
+# impl Completion { fn new() -> Self { Completion { tokens: 100 } } }
+# struct BillingService;
+# impl BillingService { fn charge_usage(&mut self, _tokens: i32) {} }
+struct LLMClient;
 
-impl Cafe {
-    fn buy_coffee(&self, cc: &mut CreditCard) -> Coffee {
-        let cup = Coffee::new();
-        cc.charge(cup.price);
-        cup
+impl LLMClient {
+    fn generate_completion(&self, billing: &mut BillingService) -> Completion {
+        let response = Completion::new();
+        billing.charge_usage(response.tokens);
+        response
     }
 }
 # fn main() {
-#     let cafe = Cafe;
-#     let mut cc = CreditCard;
-#     let _ = cafe.buy_coffee(&mut cc);
+#     let client = LLMClient;
+#     let mut billing = BillingService;
+#     let _ = client.generate_completion(&mut billing);
 # }
 ```
 
-The line `cc.charge(cup.price)` is an example of a side effect. Charging a credit card involves some interaction with the outside world—suppose it requires contacting the credit card company via some web service, authorizing the transaction, charging the card, and (if successful) persisting some record of the transaction for later reference. 
+The line `billing.charge_usage(response.tokens)` is an example of a side effect. Charging for usage involves interaction with the outside world—suppose it requires contacting a database, updating a distributed quota system, or calling an external payment provider like Stripe.
 
-But our function merely returns a `Coffee` and these other actions are happening on the side, hence the term “side effect.”
+But our function merely returns a `Completion` (the text response) and these other actions are happening on the side, hence the term “side effect.”
 
-As a result of this side effect, the code is difficult to test. We don’t want our tests to actually contact the credit card company and charge the card! This lack of testability is suggesting a design change: arguably, `CreditCard` shouldn’t have any knowledge baked into it about how to contact the credit card company to actually execute a charge, nor should it have knowledge of how to persist a record of this charge in our internal systems. We can make the code more modular and testable by letting `CreditCard` be ignorant of these concerns and passing a `Payments` object into `buy_coffee`.
+As a result of this side effect, the code is difficult to test. We don’t want our unit tests to actually contact the billing system and charge real money! This lack of testability is suggesting a design change: arguably, `LLMClient` shouldn’t have any knowledge baked into it about how to contact the billing system, nor should it have knowledge of how to persist transaction records. We can make the code more modular and testable by letting `LLMClient` be ignorant of these concerns and passing a `Billing` object into `generate_completion`.
 
 ```rust
-# #[derive(Clone, Copy)] struct Coffee { price: f64 }
-# impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
-# struct CreditCard;
-# trait Payments { fn charge(&mut self, cc: &mut CreditCard, amount: f64); }
-# struct MockPayments;
-# impl Payments for MockPayments { fn charge(&mut self, _cc: &mut CreditCard, _amount: f64) {} }
-struct Cafe;
+# #[derive(Clone, Copy)] struct Completion { tokens: i32 }
+# impl Completion { fn new() -> Self { Completion { tokens: 100 } } }
+# struct BillingService;
+# trait Billing { fn charge_usage(&mut self, tokens: i32); }
+# struct MockBilling;
+# impl Billing for MockBilling { fn charge_usage(&mut self, _tokens: i32) {} }
+struct LLMClient;
 
-impl Cafe {
-    fn buy_coffee(&self, cc: &mut CreditCard, p: &mut dyn Payments) -> Coffee {
-        let cup = Coffee::new();
-        p.charge(cc, cup.price);
-        cup
+impl LLMClient {
+    fn generate_completion(&self, billing: &mut dyn Billing) -> Completion {
+        let response = Completion::new();
+        billing.charge_usage(response.tokens);
+        response
     }
 }
 # fn main() {
-#     let cafe = Cafe;
-#     let mut cc = CreditCard;
-#     let mut p = MockPayments;
-#     let _ = cafe.buy_coffee(&mut cc, &mut p);
+#     let client = LLMClient;
+#     let mut mock = MockBilling;
+#     let _ = client.generate_completion(&mut mock);
 # }
 ```
 
-Though side effects still occur when we call `p.charge(cc, cup.price)`, we have at least regained some testability. `Payments` can be a trait (interface), and we can write a mock implementation of this trait that is suitable for testing. But that isn’t ideal either. We’re forced to make `Payments` a trait, when a concrete struct may have been fine otherwise, and any mock implementation will be awkward to use. For example, it might contain some internal state that we’ll have to inspect after the call to `buy_coffee`, and our test will have to make sure this state has been appropriately modified (mutated) by the call to `charge`.
+Though side effects still occur when we call `billing.charge_usage`, we have at least regained some testability. `Billing` can be a trait (interface), and we can write a mock implementation of this trait that is suitable for testing. But that isn’t ideal either. We’re forced to make `Billing` a trait, when a concrete struct may have been fine otherwise, and any mock implementation will be awkward to use. For example, it might contain some internal state that we’ll have to inspect after the call to `generate_completion`, and our test will have to make sure this state has been appropriately modified (mutated) by the call.
 
-Separate from the concern of testing, there’s another problem: it’s difficult to reuse `buy_coffee`. Suppose a customer, Alice, would like to order 12 cups of coffee. Ideally we could just reuse `buy_coffee` for this, perhaps calling it 12 times in a loop. But as it is currently implemented, that will involve contacting the payment system 12 times, authorizing 12 separate charges to Alice’s credit card! That adds more processing fees and isn’t good for Alice or the coffee shop.
+Separate from the concern of testing, there’s another problem: it’s difficult to reuse `generate_completion`. Suppose we want to implement a "Chain of Thought" workflow where we generate 12 intermediate reasoning steps. Ideally we could just reuse `generate_completion` for this, perhaps calling it 12 times in a loop. But as it is currently implemented, that will involve contacting the billing system 12 times! That adds significant latency and load to our billing infrastructure.
 
 ### 1.1.2 A functional solution: removing the side effects
 
-The functional solution is to eliminate side effects and have `buy_coffee` return the charge as a value in addition to returning the `Coffee`. The concerns of processing the charge by sending it off to the credit card company, persisting a record of it, and so on, will be handled elsewhere.
+The functional solution is to eliminate side effects and have `generate_completion` return the usage cost as a value in addition to returning the `Completion`. The concerns of processing the cost by checking quotas, persisting records, and so on, will be handled elsewhere.
 
 Here’s what a functional solution might look like in Rust:
 
 ```rust
-# #[derive(Clone)] struct CreditCard;
-# #[derive(Clone, Copy)] struct Coffee { price: f64 }
-# impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
-# struct Charge { cc: CreditCard, amount: f64 }
-# impl Charge { fn new(cc: CreditCard, amount: f64) -> Self { Charge { cc, amount } } }
-struct Cafe;
+# #[derive(Clone)] struct AccountId;
+# #[derive(Clone, Copy)] struct Completion { tokens: i32 }
+# impl Completion { fn new() -> Self { Completion { tokens: 100 } } }
+# struct TokenUsage { account: AccountId, tokens: i32 }
+# impl TokenUsage { fn new(account: AccountId, tokens: i32) -> Self { TokenUsage { account, tokens } } }
+struct LLMClient;
 
-impl Cafe {
-    fn buy_coffee(&self, cc: &CreditCard) -> (Coffee, Charge) {
-        let cup = Coffee::new();
-        (cup, Charge::new(cc.clone(), cup.price))
+impl LLMClient {
+    fn generate_completion(&self, account: &AccountId) -> (Completion, TokenUsage) {
+        let response = Completion::new();
+        (response, TokenUsage::new(account.clone(), response.tokens))
     }
 }
 # fn main() {
-#     let cafe = Cafe;
-#     let cc = CreditCard;
-#     let _ = cafe.buy_coffee(&cc);
+#     let client = LLMClient;
+#     let account = AccountId;
+#     let _ = client.generate_completion(&account);
 # }
 ```
 
-Here we’ve separated the concern of creating a charge from the processing or interpretation of that charge. The `buy_coffee` function now returns a `Charge` as a value along with the `Coffee`. We’ll see shortly how this lets us reuse it more easily to purchase multiple coffees with a single transaction. But what is `Charge`? It’s a data type we just invented containing a `CreditCard` and an amount, equipped with a handy function, `combine`, for combining charges with the same `CreditCard`:
+Here we’ve separated the concern of *creating* a usage record from the *processing* of that record. The `generate_completion` function now returns a `TokenUsage` as a value along with the `Completion`. We’ll see shortly how this lets us reuse it more easily to generate multiple completions with a single transaction. But what is `TokenUsage`? It’s a data type we just invented containing an `AccountId` and an amount, equipped with a handy function, `combine`, for combining usage logs for the same Account:
 
 ```rust
-# #[derive(PartialEq, Clone)] struct CreditCard;
-struct Charge {
-    cc: CreditCard,
-    amount: f64,
+# #[derive(PartialEq, Clone)] struct AccountId;
+struct TokenUsage {
+    account: AccountId,
+    tokens: i32,
 }
 
-impl Charge {
-    fn combine(&self, other: &Charge) -> Result<Charge, String> {
-        if self.cc == other.cc {
-            Ok(Charge {
-                cc: self.cc.clone(),
-                amount: self.amount + other.amount,
+impl TokenUsage {
+    fn combine(&self, other: &TokenUsage) -> Result<TokenUsage, String> {
+        if self.account == other.account {
+            Ok(TokenUsage {
+                account: self.account.clone(),
+                tokens: self.tokens + other.tokens,
             })
         } else {
-            Err("Can't combine charges to different cards".to_string())
+            Err("Can't combine usage for different accounts".to_string())
         }
     }
 }
 # fn main() {
-#    let cc = CreditCard;
-#    let c1 = Charge { cc: cc.clone(), amount: 2.0 };
-#    let c2 = Charge { cc, amount: 3.0 };
-#    assert!(c1.combine(&c2).is_ok());
+#    let acc = AccountId;
+#    let u1 = TokenUsage { account: acc.clone(), tokens: 50 };
+#    let u2 = TokenUsage { account: acc, tokens: 150 };
+#    assert!(u1.combine(&u2).is_ok());
 # }
 ```
 
-Now let’s look at `buy_coffees`, to implement the purchase of `n` cups of coffee. Unlike before, this can now be implemented in terms of `buy_coffee`, as we had hoped.
+Now let’s look at `batch_generate`, to implement the generation of `n` completions. Unlike before, this can now be implemented in terms of `generate_completion`, as we had hoped.
 
 ```rust
-# #[derive(PartialEq, Clone)] struct CreditCard;
-# #[derive(Clone, Copy)] struct Coffee { price: f64 }
-# impl Coffee { fn new() -> Self { Coffee { price: 2.5 } } }
-# #[derive(Clone)] struct Charge { cc: CreditCard, amount: f64 }
-# impl Charge { 
-#    fn new(cc: CreditCard, amount: f64) -> Self { Charge { cc, amount } } 
-#    fn combine(&self, other: &Charge) -> Result<Charge, String> { Ok(Charge { cc: self.cc.clone(), amount: self.amount + other.amount }) }
+# #[derive(PartialEq, Clone)] struct AccountId;
+# #[derive(Clone, Copy)] struct Completion { tokens: i32 }
+# impl Completion { fn new() -> Self { Completion { tokens: 100 } } }
+# #[derive(Clone)] struct TokenUsage { account: AccountId, tokens: i32 }
+# impl TokenUsage { 
+#    fn new(account: AccountId, tokens: i32) -> Self { TokenUsage { account, tokens } } 
+#    fn combine(&self, other: &TokenUsage) -> Result<TokenUsage, String> { Ok(TokenUsage { account: self.account.clone(), tokens: self.tokens + other.tokens }) }
 # }
-# struct Cafe;
-impl Cafe {
-#   fn buy_coffee(&self, cc: &CreditCard) -> (Coffee, Charge) { (Coffee::new(), Charge::new(cc.clone(), 2.5)) }
-    fn buy_coffees(&self, cc: &CreditCard, n: usize) -> (Vec<Coffee>, Charge) {
-        let purchases: Vec<(Coffee, Charge)> = (0..n)
-            .map(|_| self.buy_coffee(cc))
+# struct LLMClient;
+impl LLMClient {
+#   fn generate_completion(&self, account: &AccountId) -> (Completion, TokenUsage) { (Completion::new(), TokenUsage::new(account.clone(), 100)) }
+    fn batch_generate(&self, account: &AccountId, n: usize) -> (Vec<Completion>, TokenUsage) {
+        let results: Vec<(Completion, TokenUsage)> = (0..n)
+            .map(|_| self.generate_completion(account))
             .collect();
         
-        let (coffees, charges): (Vec<Coffee>, Vec<Charge>) = purchases.into_iter().unzip();
+        let (completions, usages): (Vec<Completion>, Vec<TokenUsage>) = results.into_iter().unzip();
         
-        let combined_charge = charges.into_iter()
-            .reduce(|c1, c2| c1.combine(&c2).unwrap())
-            .unwrap_or(Charge::new(cc.clone(), 0.0)); // Handle 0 coffees case
+        let total_usage = usages.into_iter()
+            .reduce(|u1, u2| u1.combine(&u2).unwrap())
+            .unwrap_or(TokenUsage::new(account.clone(), 0));
             
-        (coffees, combined_charge)
+        (completions, total_usage)
     }
 }
 # fn main() {
-#     let cafe = Cafe;
-#     let cc = CreditCard;
-#     let (_, charge) = cafe.buy_coffees(&cc, 12);
-#     assert_eq!(charge.amount, 30.0);
+#     let client = LLMClient;
+#     let acc = AccountId;
+#     let (_, usage) = client.batch_generate(&acc, 12);
+#     assert_eq!(usage.tokens, 1200);
 # }
 ```
 
-Overall, this solution is a marked improvement—we’re now able to reuse `buy_coffee` directly to define the `buy_coffees` function, and both functions are trivially testable without having to define complicated mock implementations of some `Payments` interface!
+Overall, this solution is a marked improvement—we’re now able to reuse `generate_completion` directly to define the `batch_generate` function, and both functions are trivially testable without having to define complicated mock implementations of some `Billing` interface!
 
-Making `Charge` into a first-class value has other benefits we might not have anticipated: we can more easily assemble business logic for working with these charges. For instance, Alice may bring her laptop to the coffee shop and work there for a few hours, making occasional purchases. It might be nice if the coffee shop could combine these purchases Alice makes into a single charge, again saving on credit card processing fees. Since `Charge` is first-class, we can write the following function to coalesce any same-card charges in a `Vec<Charge>`:
+Making `TokenUsage` into a first-class value has other benefits we might not have anticipated: we can more easily assemble business logic for working with these usage logs. For instance, an Agent might run a complex multi-step workflow involving creating documents, researching, and coding. It might be nice if we could combine all the usage across these different tools into a single billable event. Since `TokenUsage` is first-class, we can write the following function to coalesce any same-account usage in a `Vec<TokenUsage>`:
 
 ```rust
 # use std::collections::HashMap;
-# #[derive(PartialEq, Eq, Clone, Hash)] struct CreditCard;
-# #[derive(Clone)] struct Charge { cc: CreditCard, amount: f64 }
-# impl Charge { fn combine(&self, other: &Charge) -> Result<Charge, String> { Ok(Charge { cc: self.cc.clone(), amount: self.amount + other.amount }) } }
-
-fn coalesce(charges: Vec<Charge>) -> Vec<Charge> {
+# #[derive(PartialEq, Eq, Clone, Hash)] struct AccountId;
+# #[derive(Clone)] struct TokenUsage { account: AccountId, tokens: i32 }
+# impl TokenUsage { fn combine(&self, other: &TokenUsage) -> Result<TokenUsage, String> { Ok(TokenUsage { account: self.account.clone(), tokens: self.tokens + other.tokens }) } }
+ 
+fn coalesce_usage(logs: Vec<TokenUsage>) -> Vec<TokenUsage> {
     // In a real Rust app, we might use itertools using a HashMap or sort first
     // Since we don't have itertools in pure std, we can implement it simply.
-    // For brevity, let's assume we have a way to group by card:
     
-    let mut groups: HashMap<CreditCard, Vec<Charge>> = HashMap::new();
-    for charge in charges {
-        groups.entry(charge.cc.clone()).or_default().push(charge);
+    let mut groups: HashMap<AccountId, Vec<TokenUsage>> = HashMap::new();
+    for log in logs {
+        groups.entry(log.account.clone()).or_default().push(log);
     }
     
     groups.values()
-        .map(|list| list.iter().cloned().reduce(|c1, c2| c1.combine(&c2).unwrap()).unwrap())
+        .map(|list| list.iter().cloned().reduce(|u1, u2| u1.combine(&u2).unwrap()).unwrap())
         .collect()
 }
 # fn main() {
-#    let cc = CreditCard;
-#    let charges = vec![Charge { cc: cc.clone(), amount: 1.0 }, Charge { cc, amount: 2.0 }];
-#    let coalesced = coalesce(charges);
-#    assert_eq!(coalesced.len(), 1);
-#    assert_eq!(coalesced[0].amount, 3.0);
+#    let acc = AccountId;
+#    let logs = vec![TokenUsage { account: acc.clone(), tokens: 10 }, TokenUsage { account: acc, tokens: 20 }];
+#    let summary = coalesce_usage(logs);
+#    assert_eq!(summary[0].tokens, 30);
 # }
 ```
 
-This sort of transformation can be applied to any function with side effects to push these effects to the outer layers of the program. Functional programmers often speak of implementing programs with a pure core and a thin layer on the outside that handles effects.
+This sort of transformation can be applied to any function with side effects to push these effects to the outer layers of the program. Functional programmers often speak of implementing programs with a pure core and a thin layer on the outside that handles effects (I/O).
 
 ## 1.2 Exactly what is a (pure) function?
 
-We said earlier that FP means programming with pure functions, and a pure function is one that lacks side effects. In our discussion of the coffee shop example, we worked off an informal notion of side effects and purity. Here we’ll formalize this notion, to pinpoint more precisely what it means to program functionally.
+We said earlier that FP means programming with pure functions, and a pure function is one that lacks side effects. In our discussion of the LLM example, we worked off an informal notion of side effects and purity. Here we’ll formalize this notion, to pinpoint more precisely what it means to program functionally (or "Agentically").
 
 A function `f` with input type `A` and output type `B` (written in Rust as `fn(A) -> B`) is a computation that relates every value `a` of type `A` to exactly one value `b` of type `B` such that `b` is determined solely by the value of `a`. Any changing state of an internal or external process is irrelevant to computing the result `f(a)`. For example, a function `int_to_string` having type `fn(i32) -> String` will take every integer to a corresponding string. Furthermore, if it really is a function, it will do nothing else.
 
-In other words, a function has no observable effect on the execution of the program other than to compute a result given its inputs; we say that it has no side effects.
+In other words, a function (or **Deterministic Tool**) has no observable effect on the execution of the program other than to compute a result given its inputs; we say that it has no side effects.
 
 We can formalize this idea of pure functions using the concept of **referential transparency (RT)**. This is a property of expressions in general and not just functions. For the purposes of our discussion, consider an expression to be any part of a program that can be evaluated to a result. For example, `2 + 3` is an expression that applies the pure function `+` to the values `2` and `3`. This has no side effect. The evaluation of this expression results in the same value `5` every time. In fact, if we saw `2 + 3` in a program we could simply replace it with the value `5` and it wouldn’t change a thing about the meaning of our program.
 
@@ -220,19 +218,19 @@ This is all it means for an expression to be referentially transparent—in any 
 
 ## 1.3 Referential transparency, purity, and the substitution model
 
-Let’s see how the definition of RT applies to our original `buy_coffee` example:
+Let’s see how the definition of RT applies to our original `generate_completion` example:
 
 ```rust,ignore
-fn buy_coffee(&self, cc: &mut CreditCard) -> Coffee {
-    let cup = Coffee::new();
-    cc.charge(cup.price);
-    cup
+fn generate_completion(&self, billing: &mut BillingService) -> Completion {
+    let response = Completion::new();
+    billing.charge_usage(response.tokens);
+    response
 }
 ```
 
-Whatever the return type of `cc.charge(cup.price)` (perhaps it’s `()` unit), it’s discarded by `buy_coffee`. Thus, the result of evaluating `buy_coffee(alice_credit_card)` will be merely `cup`, which is equivalent to a `Coffee::new()`. For `buy_coffee` to be pure, by our definition of RT, it must be the case that `p(buy_coffee(alice_credit_card))` behaves the same as `p(Coffee::new())`, for any `p`.
+Whatever the return type of `billing.charge_usage(...)` (perhaps it’s `()` unit), it’s discarded by `generate_completion`. Thus, the result of evaluating `generate_completion(my_account)` will be merely `response`. For `generate_completion` to be pure, by our definition of RT, it must be the case that `p(generate_completion(my_account))` behaves the same as `p(Completion::new())`, for any `p`.
 
-This clearly doesn’t hold—the program `Coffee::new()` doesn’t do anything, whereas `buy_coffee(alice_credit_card)` will contact the credit card company and authorize a charge. Already we have an observable difference between the two programs.
+This clearly doesn’t hold—the program `Completion::new()` doesn’t do anything, whereas `generate_completion(my_account)` will contact the billing system and charge real money. Already we have an observable difference between the two programs.
 
 Referential transparency forces the invariant that everything a function does is represented by the value that it returns, according to the result type of the function. This constraint enables a simple and natural mode of reasoning about program evaluation called the **substitution model**. When expressions are referentially transparent, we can imagine that computation proceeds much like we’d solve an algebraic equation. We fully expand every part of an expression, replacing all variables with their referents, and then reduce it to its simplest form. At each step we replace a term with an equivalent one; computation proceeds by substituting equals for equals. In other words, RT enables equational reasoning about programs.
 
@@ -240,7 +238,7 @@ Referential transparency forces the invariant that everything a function does is
 
 In this chapter, we introduced functional programming and explained exactly what FP is and why you might use it. We illustrated some of the benefits of FP using a simple example. We also discussed referential transparency and the substitution model and talked about how FP enables simpler reasoning about programs and greater modularity.
 
-In this book, you’ll learn the concepts and principles of FP as they apply to every level of programming, starting from the simplest of tasks and building on that foundation.
+In this book, you’ll learn the concepts and principles of FP as they apply to every level of Agentic programming, starting from the simplest of tasks and building on that foundation.
 
 ## 1.5 References
 
